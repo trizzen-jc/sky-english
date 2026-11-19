@@ -220,6 +220,7 @@
   .chip .chip-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; color: var(--brand-ink); }
   .chip .chip-label { font-size: 13.5px; font-weight: 700; color: var(--text); }
   .chip.is-on { border-color: var(--brand); background: var(--brand-soft); box-shadow: var(--shadow-sm); }
+  .chip.is-static { cursor: default; }
 
   /* ── 장면 칩 줄 + 큼직한 Eng/Kor 전환 버튼 ───────────── */
   .scene-row { display: flex; align-items: stretch; gap: 8px; padding: 2px 2px 10px; }
@@ -721,7 +722,7 @@
           it: { text: 'Caffè', pron: '까페', tip: "강세는 마지막 '페'. 에스프레소는 un espresso(운 에스프레쏘)." },
           es: { text: 'Café', pron: '카페', tip: "강세는 '페'. 우유 커피는 café con leche(카페 꼰 레체)." },
           fr: { text: 'Café', pron: '카페', tip: "철자는 같아도 '카페'. 작은 커피는 un petit café(앙 쁘띠 카페)." },
-          ja: { text: 'コーヒー', pron: '코-히-', aux: 'kōhī', tip: "길게 '코-히-'. 아이스는 アイスコーヒー(아이스 코-히-)." },
+          ja: { text: 'コーヒー', pron: '코히', aux: 'kōhī', tip: "길게 '코-히-'. 아이스는 アイスコーヒー(아이스 코-히-)." },
           zh: { text: '咖啡', pron: '카페이', aux: 'kāfēi', tip: "'카-페이'. 아이스 아메리카노는 冰美式(빙 메이스)." }
         }
       },
@@ -732,7 +733,7 @@
           es: { text: 'Disculpe', pron: '디스꿀페', tip: '말을 걸 때. 진짜 사과는 Perdón(뻬르돈).' },
           fr: { text: 'Excusez-moi', pron: '엑스퀴제 무아', tip: '말 걸기 전 한마디. Pardon(빠르동)은 지나갈 때.' },
           ja: { text: 'すみません', pron: '스미마셍', aux: 'sumimasen', tip: '부르기·사과·고마움까지 다 되는 만능말.' },
-          zh: { text: '不好意思', pron: '부하오이스', aux: 'bù hǎo yìsi', tip: '가볍게 사과하거나 말을 걸 때. 격식은 请问(칭원, "실례지만").' }
+          zh: { text: '不好意思', pron: '뿌하오이스', aux: 'bù hǎo yìsi', tip: '가볍게 사과하거나 말을 걸 때. 격식은 请问(칭원, "실례지만").' }
         }
       },
       {
@@ -761,7 +762,7 @@
           it: { text: 'Vorrei ~', pron: '보레이 ~', tip: "'원하다'의 조건법 — 주문할 때 가장 부드러운 요청.", ex: 'Vorrei un caffè, per favore.', exPron: '보레이 운 까페, 뻬르 파보레', exKo: '커피 한 잔 주세요.' },
           es: { text: 'Quisiera ~', pron: '키시에라 ~', tip: "'querer'의 접속법 과거형. 회화에선 Me gustaría ~(메 구스따리아 ~)도 많이 써요.", ex: 'Quisiera un café, por favor.', exPron: '키시에라 운 카페, 뽀르 파보르', exKo: '커피 한 잔 주세요.' },
           fr: { text: 'Je voudrais ~', pron: '즈 부드레 ~', tip: "vouloir의 조건법. '즈 부드레'를 한 덩어리로 붙여 읽어요.", ex: "Je voudrais un café, s'il vous plaît.", exPron: '즈 부드레 앙 카페, 실 부 플레', exKo: '커피 한 잔 주세요.' },
-          ja: { text: '~をください', pron: '~오 쿠다사이', aux: '~ o kudasai', tip: '명사 + を + ください. 더 정중하게는 お願いします(오네가이시마스).', ex: 'コーヒーをください。', exPron: '코-히-오 쿠다사이', exKo: '커피 주세요.' },
+          ja: { text: '~をください', pron: '~오 쿠다사이', aux: '~ o kudasai', tip: '명사 + を + ください. 더 정중하게는 お願いします(오네가이시마스).', ex: 'コーヒーをください。', exPron: '코히오 쿠다사이', exKo: '커피 주세요.' },
           zh: { text: '请给我 ~', pron: '칭 게이 워 ~', aux: 'qǐng gěi wǒ ~', tip: '请(부디) + 给(주다) + 我(나에게), 목적어는 그 뒤에 와요.', ex: '请给我一杯咖啡。', exPron: '칭 게이 워 이 뻬이 카페이', exKo: '커피 한 잔 주세요.' }
         }
       }
@@ -1346,8 +1347,7 @@
           'aria-selected': on ? 'true' : 'false',
           title: l.name + (l.intro ? ' (5개국어 입문)' : ' (메인 회화)')
         }, [
-          el('span', { text: l.tab }),
-          l.intro ? el('span', { class: 'soon', text: '입문' }) : null
+          el('span', { text: l.tab })
         ]);
         press(b, function () {
           if (state.lang === l.code) { return; }
@@ -1796,7 +1796,7 @@
   var miniRefs = {};
 
   function introChip() {
-    return el('div', { class: 'chip is-on', 'data-intro': INTRO.id }, [
+    return el('div', { class: 'chip is-on is-static', 'data-intro': INTRO.id }, [
       el('span', { class: 'chip-kicker', text: INTRO.chipKicker }),
       el('span', { class: 'chip-label', text: INTRO.chipLabel })
     ]);
