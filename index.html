@@ -337,6 +337,52 @@
   .btn-learned.is-done { background: var(--ok-soft); border-color: transparent; color: var(--ok); box-shadow: none; }
   .foot-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 7px; }
 
+  /* ── 5개국어 동시학습 (입문) ─────────────────────────── */
+  .unit-hint { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .badge.kind-word { background: var(--badge-m-bg); color: var(--badge-m-fg); }
+  .badge.kind-phrase { background: var(--badge-p-bg); color: var(--badge-p-fg); }
+  .badge.kind-grammar { background: var(--hint-bg); color: var(--hint-fg); }
+  .mini-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .mini {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 46px; min-height: 34px; padding: 4px 9px;
+    border-radius: 11px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text);
+    font-size: 16px; line-height: 1; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .mini:active { transform: scale(0.95); }
+  .mini.is-on { border-color: var(--brand); background: var(--brand-soft); }
+  .mini:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .mini-panel {
+    margin-top: 9px; padding: 10px 12px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--line);
+    animation: fade 0.18s ease both;
+  }
+  .mini-top { display: flex; align-items: center; gap: 5px; }
+  .mini-flag-lg { font-size: 14px; }
+  .mini-lang { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: 0.02em; }
+  .mini-orig { font-size: 17px; font-weight: 750; line-height: 1.45; margin-top: 3px; letter-spacing: -0.01em; }
+  .mini-pron { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .mini-pron b { font-size: 17px; font-weight: 900; color: var(--brand-ink); letter-spacing: 0.01em; }
+  .mini-aux { font-size: 12px; color: var(--muted); margin-top: 1px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .mini-ex { margin-top: 7px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+  .mini-ex-text { font-size: 14px; font-weight: 700; }
+  .mini-ex-pron { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .mini-ex-pron b { font-size: 13.5px; font-weight: 900; color: var(--brand-ink); }
+  .mini-ex-ko { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .mini-tip { font-size: 12px; color: var(--text); opacity: 0.82; margin-top: 7px; line-height: 1.5; }
+  .mini-tip::before { content: "💡 "; }
+  .mini-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .face.back .orig { font-size: 17.5px; }
+  .pron-line { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .pron-line b { font-size: 16.5px; font-weight: 900; color: var(--brand-ink); letter-spacing: 0.01em; }
+  .aux-line { font-size: 11.5px; color: var(--muted); margin-top: 1px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .unit-tip { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .back-speed { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; }
+  .back-speed .seg-label { margin-bottom: 0; }
+
   /* ── 패널 / 연습 / 퀴즈 ───────────────────────────────── */
   .panel {
     background: var(--surface); border: 1px solid var(--line);
@@ -558,12 +604,6 @@
                  → 없으면 hint(또는 en)에서 자동 생성한다.
      ════════════════════════════════════════════════════ */
   var CONTENT = {
-    langs: [
-      { code: 'en', label: '🇺🇸 English', ready: true },
-      { code: 'ja', label: '🇯🇵 日本語', ready: false },
-      { code: 'es', label: '🇪🇸 Español', ready: false },
-      { code: 'it', label: '🇮🇹 Italiano', ready: false }
-    ],
     scenes: [
       {
         id: 'cafe-sample-order',
@@ -634,6 +674,101 @@
   };
 
   /* ════════════════════════════════════════════════════
+     1-B. 언어 정의 — English(메인 회화) + 5개국어 입문
+     ════════════════════════════════════════════════════ */
+  var LANGS = [
+    { code: 'en', flag: '🇺🇸', label: 'English', tab: '🇺🇸 English', short: 'Eng', name: '영어', tts: 'en-US', intro: false },
+    { code: 'it', flag: '🇮🇹', label: '이태리어', tab: '🇮🇹 이태리어', short: 'Ita', name: '이태리어', tts: 'it-IT', intro: true },
+    { code: 'es', flag: '🇪🇸', label: '스페인어', tab: '🇪🇸 스페인어', short: 'Esp', name: '스페인어', tts: 'es-ES', intro: true },
+    { code: 'fr', flag: '🇫🇷', label: '불어', tab: '🇫🇷 불어', short: 'Fra', name: '불어', tts: 'fr-FR', intro: true },
+    { code: 'ja', flag: '🇯🇵', label: '일어', tab: '🇯🇵 일어', short: 'Jpn', name: '일어', tts: 'ja-JP', intro: true },
+    { code: 'zh', flag: '🇨🇳', label: '중국어', tab: '🇨🇳 중국어', short: 'Chn', name: '중국어', tts: 'zh-CN', intro: true }
+  ];
+  var INTRO_CODES = ['it', 'es', 'fr', 'ja', 'zh'];
+
+  /* 5개국어 입문 샘플 1세트 — 최소 학습 단위 7개(단어 3 · 회화 3 · 문법 1)
+     각 단위의 t[언어] = { text 원문, pron 한글 발음(필수), aux 보조 표기(일어 로마자/중국어 병음), tip 힌트,
+                          ex/exPron/exKo 문법 예문 } */
+  var INTRO = {
+    id: 'intro-day1-cafe',
+    chipKicker: '☕ Day 1',
+    chipLabel: '첫인사와 커피 한 잔',
+    title: '같은 한국어를 5개국어로 — 단어 3 · 회화 3 · 문법 1',
+    units: [
+      {
+        id: 'w1', kind: 'word', kindLabel: '단어', ko: '안녕하세요', hint: '만났을 때 가장 먼저',
+        t: {
+          it: { text: 'Ciao', pron: '챠오', tip: '가까운 사이·캐주얼 인사. 격식은 Buongiorno(봉조르노).' },
+          es: { text: 'Hola', pron: '올라', tip: '하루 언제나 OK. 격식은 Buenos días(부에노스 디아스).' },
+          fr: { text: 'Bonjour', pron: '봉주르', tip: '낮 인사. 친구끼리는 Salut(살뤼), 저녁엔 Bonsoir(봉수아르).' },
+          ja: { text: 'こんにちは', pron: '곤니찌와', aux: 'konnichiwa', tip: '낮 인사. 아침은 おはようございます(오하요- 고자이마스).' },
+          zh: { text: '你好', pron: '니하오', aux: 'nǐ hǎo', tip: '어른·여러 명에겐 您好(닌하오).' }
+        }
+      },
+      {
+        id: 'w2', kind: 'word', kindLabel: '단어', ko: '감사합니다', hint: '고마움을 전할 때',
+        t: {
+          it: { text: 'Grazie', pron: '그라찌에', tip: '더 정중하게 Grazie mille(그라찌에 밀레).' },
+          es: { text: 'Gracias', pron: '그라시아스', tip: '더 정중하게 Muchas gracias(무차스 그라시아스).' },
+          fr: { text: 'Merci', pron: '메르시', tip: '강조할 땐 Merci beaucoup(메르시 보쿠).' },
+          ja: { text: 'ありがとうございます', pron: '아리가또 고자이마스', aux: 'arigatō gozaimasu', tip: '가볍게는 ありがとう(아리가또).' },
+          zh: { text: '谢谢', pron: '셰셰', aux: 'xièxie', tip: '둘째 글자는 가볍게. 정중하게는 谢谢您(셰셰 닌).' }
+        }
+      },
+      {
+        id: 'w3', kind: 'word', kindLabel: '단어', ko: '커피', hint: '오늘의 주인공',
+        t: {
+          it: { text: 'Caffè', pron: '까페', tip: "강세는 마지막 '페'. 에스프레소는 un espresso(운 에스프레쏘)." },
+          es: { text: 'Café', pron: '카페', tip: "강세는 '페'. 우유 커피는 café con leche(카페 꼰 레체)." },
+          fr: { text: 'Café', pron: '카페', tip: "철자는 같아도 '카페'. 작은 커피는 un petit café(앙 쁘띠 카페)." },
+          ja: { text: 'コーヒー', pron: '코-히-', aux: 'kōhī', tip: "길게 '코-히-'. 아이스는 アイスコーヒー(아이스 코-히-)." },
+          zh: { text: '咖啡', pron: '카페이', aux: 'kāfēi', tip: "'카-페이'. 아이스 아메리카노는 冰美式(빙 메이스)." }
+        }
+      },
+      {
+        id: 'p1', kind: 'phrase', kindLabel: '회화', ko: '실례합니다.', hint: '말을 걸기 전 한마디',
+        t: {
+          it: { text: 'Mi scusi', pron: '미 스쿠지', tip: '낯선 사람을 부르거나 가볍게 사과할 때 쓰는 격식체.' },
+          es: { text: 'Disculpe', pron: '디스꿀페', tip: '말을 걸 때. 진짜 사과는 Perdón(뻬르돈).' },
+          fr: { text: 'Excusez-moi', pron: '엑스퀴제 무아', tip: '말 걸기 전 한마디. Pardon(빠르동)은 지나갈 때.' },
+          ja: { text: 'すみません', pron: '스미마셍', aux: 'sumimasen', tip: '부르기·사과·고마움까지 다 되는 만능말.' },
+          zh: { text: '不好意思', pron: '부하오이스', aux: 'bù hǎo yìsi', tip: '가볍게 사과하거나 말을 걸 때. 격식은 请问(칭원, "실례지만").' }
+        }
+      },
+      {
+        id: 'p2', kind: 'phrase', kindLabel: '회화', ko: '아메리카노 한 잔 주세요.', hint: '카페에서 바로 써먹기',
+        t: {
+          it: { text: 'Un caffè americano, per favore.', pron: '운 까페 아메리까노, 뻬르 파보레', tip: '끝에 per favore(뻬르 파보레)를 붙이면 정중해져요.' },
+          es: { text: 'Un café americano, por favor.', pron: '운 카페 아메리카노, 뽀르 파보르', tip: "por favor(뽀르 파보르)는 '부탁합니다'." },
+          fr: { text: "Un café américain, s'il vous plaît.", pron: '앙 카페 아메리캥, 실 부 플레', tip: "s'il vous plaît(실 부 플레)는 주문할 때 필수." },
+          ja: { text: 'アメリカーノを一杯ください。', pron: '아메리카-노오 잇파이 쿠다사이', aux: 'amerikāno o ippai kudasai', tip: '一杯(잇파이) = 한 잔.' },
+          zh: { text: '请给我一杯美式咖啡。', pron: '칭 게이 워 이 뻬이 메이스 카페이', aux: 'qǐng gěi wǒ yì bēi měishì kāfēi', tip: '请给我 ~(칭 게이 워) = "~ 주세요". 美式(메이스) = 아메리카노.' }
+        }
+      },
+      {
+        id: 'p3', kind: 'phrase', kindLabel: '회화', ko: '얼마예요?', hint: '가격을 물을 때',
+        t: {
+          it: { text: 'Quanto costa?', pron: '콴토 코스타', tip: '가게에서 가장 흔한 가격 질문.' },
+          es: { text: '¿Cuánto cuesta?', pron: '꽌또 꾸에스따', tip: '물건이 여럿이면 ¿Cuánto cuestan?(꽌또 꾸에스딴).' },
+          fr: { text: "C'est combien ?", pron: '세 콩비앙', tip: '정중하게는 Combien ça coûte ?(콩비앙 싸 꾸뜨).' },
+          ja: { text: 'いくらですか。', pron: '이쿠라 데스까', aux: 'ikura desu ka', tip: 'これはいくらですか(코레와 이쿠라 데스까)로 물건을 가리켜요.' },
+          zh: { text: '多少钱？', pron: '뚜어샤오 치엔', aux: 'duōshao qián', tip: '这个多少钱?(쩌거 뚜어샤오 치엔) = "이거 얼마예요?".' }
+        }
+      },
+      {
+        id: 'g1', kind: 'grammar', kindLabel: '문법', ko: '~ 주세요', sub: '정중한 요청', hint: '오늘의 문법 뼈대',
+        t: {
+          it: { text: 'Vorrei ~', pron: '보레이 ~', tip: "'원하다'의 조건법 — 주문할 때 가장 부드러운 요청.", ex: 'Vorrei un caffè, per favore.', exPron: '보레이 운 까페, 뻬르 파보레', exKo: '커피 한 잔 주세요.' },
+          es: { text: 'Quisiera ~', pron: '키시에라 ~', tip: "'querer'의 접속법 과거형. 회화에선 Me gustaría ~(메 구스따리아 ~)도 많이 써요.", ex: 'Quisiera un café, por favor.', exPron: '키시에라 운 카페, 뽀르 파보르', exKo: '커피 한 잔 주세요.' },
+          fr: { text: 'Je voudrais ~', pron: '즈 부드레 ~', tip: "vouloir의 조건법. '즈 부드레'를 한 덩어리로 붙여 읽어요.", ex: "Je voudrais un café, s'il vous plaît.", exPron: '즈 부드레 앙 카페, 실 부 플레', exKo: '커피 한 잔 주세요.' },
+          ja: { text: '~をください', pron: '~오 쿠다사이', aux: '~ o kudasai', tip: '명사 + を + ください. 더 정중하게는 お願いします(오네가이시마스).', ex: 'コーヒーをください。', exPron: '코-히-오 쿠다사이', exKo: '커피 주세요.' },
+          zh: { text: '请给我 ~', pron: '칭 게이 워 ~', aux: 'qǐng gěi wǒ ~', tip: '请(부디) + 给(주다) + 我(나에게), 목적어는 그 뒤에 와요.', ex: '请给我一杯咖啡。', exPron: '칭 게이 워 이 뻬이 카페이', exKo: '커피 한 잔 주세요.' }
+        }
+      }
+    ]
+  };
+
+  /* ════════════════════════════════════════════════════
      2. 상수
      ════════════════════════════════════════════════════ */
   var INTERVALS = [1, 2, 5, 7, 14, 30];
@@ -699,6 +834,34 @@
       if (CONTENT.scenes[i].id === id) { return CONTENT.scenes[i]; }
     }
     return null;
+  }
+
+  function langDef(code) {
+    for (var i = 0; i < LANGS.length; i++) {
+      if (LANGS[i].code === code) { return LANGS[i]; }
+    }
+    return LANGS[0];
+  }
+
+  function isIntroLang(code) {
+    for (var i = 0; i < INTRO_CODES.length; i++) {
+      if (INTRO_CODES[i] === code) { return true; }
+    }
+    return false;
+  }
+
+  function introUnit(unitId) {
+    for (var i = 0; i < INTRO.units.length; i++) {
+      if (INTRO.units[i].id === unitId) { return INTRO.units[i]; }
+    }
+    return null;
+  }
+
+  /* 읽을 문장: 문법 패턴은 예문(ex)으로 읽는다 */
+  function sayOf(d) {
+    if (!d) { return ''; }
+    if (d.ex) { return d.ex; }
+    return d.text || '';
   }
 
   function findTurn(scene, turnId) {
@@ -911,6 +1074,7 @@
     if (!store) { return; }
     store.ui = {
       tab: state.tab,
+      lang: state.lang,
       sceneId: state.sceneId,
       theme: state.theme,
       speed: state.speed,
@@ -955,20 +1119,38 @@
     return !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   }
 
-  function pickVoice() {
-    if (voiceCache) { return voiceCache; }
-    var synth = window.speechSynthesis;
-    if (!synth || !synth.getVoices) { return null; }
+  function voicesList() {
+    if (!window.speechSynthesis || !window.speechSynthesis.getVoices) { return []; }
     var list = [];
-    try { list = synth.getVoices() || []; } catch (e) { list = []; }
+    try { list = window.speechSynthesis.getVoices() || []; } catch (e) { list = []; }
+    return list;
+  }
+
+  function normTag(tag) {
+    return String(tag == null ? '' : tag).toLowerCase().replace(/_/g, '-');
+  }
+
+  /* 해당 언어(예: it-IT) 음성 찾기 — 정확한 태그 우선, 없으면 같은 언어의 다른 지역 */
+  function voiceFor(tag) {
+    var want = normTag(tag);
+    var base = want.split('-')[0];
+    var list = voicesList();
     var i;
     for (i = 0; i < list.length; i++) {
-      if (/^en[-_]US/i.test(list[i].lang || '')) { voiceCache = list[i]; return voiceCache; }
+      if (normTag(list[i].lang) === want) { return list[i]; }
     }
     for (i = 0; i < list.length; i++) {
-      if (/^en/i.test(list[i].lang || '')) { voiceCache = list[i]; return voiceCache; }
+      var l = normTag(list[i].lang);
+      if (l === base || l.indexOf(base + '-') === 0) { return list[i]; }
     }
     return null;
+  }
+
+  function pickVoice() {
+    if (voiceCache) { return voiceCache; }
+    var v = voiceFor('en-US');
+    if (v) { voiceCache = v; }
+    return v;
   }
 
   function cancelSpeech() {
@@ -976,12 +1158,14 @@
     try { window.speechSynthesis.cancel(); } catch (e) { /* noop */ }
   }
 
-  function speak(text, rate, opts) {
+  /* 여러 언어 공용 재생기 — langCode 는 LANGS 의 code('en','it',…) */
+  function speakLang(text, langCode, rate, opts) {
     opts = opts || {};
+    var L = langDef(langCode);
     if (!ttsAvailable()) {
-      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 영어 발음이 나옵니다.');
+      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 발음이 나옵니다.');
       if (opts.onerror) { opts.onerror(); }
-      return null;
+      return { played: false, unsupported: true, missingVoice: false };
     }
     var synth = window.speechSynthesis;
     if (opts.cancel !== false) {
@@ -990,10 +1174,10 @@
       } catch (e2) { cancelSpeech(); }
     }
     var u = new window.SpeechSynthesisUtterance(String(text));
-    u.lang = 'en-US';
+    u.lang = L.tts;
     u.rate = rate || 1;
     u.pitch = 1;
-    var v = pickVoice();
+    var v = voiceFor(L.tts);
     if (v) { u.voice = v; }
     var done = false;
     u.onend = function () {
@@ -1010,8 +1194,13 @@
       synth.speak(u);
     } catch (e) {
       if (opts.onerror) { opts.onerror(); }
+      return { played: false, unsupported: true, missingVoice: false };
     }
-    return u;
+    return { played: true, unsupported: false, missingVoice: !v };
+  }
+
+  function speak(text, rate, opts) {
+    return speakLang(text, 'en', rate, opts);
   }
 
   function highlight(turnId) {
@@ -1146,29 +1335,29 @@
      ════════════════════════════════════════════════════ */
   function langBar() {
     var wrap = el('div', { class: 'langbar', role: 'tablist', 'aria-label': '언어 선택' });
-    for (var i = 0; i < CONTENT.langs.length; i++) {
+    for (var i = 0; i < LANGS.length; i++) {
       (function (l) {
         var on = l.code === state.lang;
         var b = el('button', {
-          class: 'lang' + (on ? ' is-on' : '') + (l.ready ? '' : ' is-soon'),
+          class: 'lang' + (on ? ' is-on' : ''),
           type: 'button',
           role: 'tab',
+          'data-lang': l.code,
           'aria-selected': on ? 'true' : 'false',
-          'aria-disabled': l.ready ? 'false' : 'true',
-          title: l.ready ? l.label : l.label + ' (준비 중)'
+          title: l.name + (l.intro ? ' (5개국어 입문)' : ' (메인 회화)')
         }, [
-          el('span', { text: l.label }),
-          l.ready ? null : el('span', { class: 'soon', text: '준비 중' })
+          el('span', { text: l.tab }),
+          l.intro ? el('span', { class: 'soon', text: '입문' }) : null
         ]);
         press(b, function () {
-          if (!l.ready) {
-            toast(l.label + ' 콘텐츠는 준비 중이에요', '지금은 English로 학습할 수 있어요.');
-            return;
-          }
-          if (state.lang !== l.code) { state.lang = l.code; renderStudy(); }
+          if (state.lang === l.code) { return; }
+          state.lang = l.code;
+          state.flipped = false;
+          saveUI();
+          renderStudy();
         });
         wrap.appendChild(b);
-      })(CONTENT.langs[i]);
+      })(LANGS[i]);
     }
     return wrap;
   }
@@ -1199,20 +1388,31 @@
     return wrap;
   }
 
-  /* ── 큰 Eng/Kor 보기 버튼 (장면 칩 줄 오른쪽) ─────────── */
+  /* ── 큰 보기 전환 버튼 (장면 칩 줄 오른쪽) ─────────────
+     오늘 주력 언어(상단에서 고른 5개국어)에 따라 라벨이 바뀐다. */
   var sideRefs = { btn: null, flag: null, lbl: null };
 
+  function sideNames() {
+    var L = langDef(state.lang);
+    if (L.intro) {
+      return { flag: L.flag, short: L.short, name: L.name };
+    }
+    return { flag: '🇺🇸', short: 'Eng', name: '영어' };
+  }
+
   function sideToggle() {
-    var eng = !!state.flipped;
-    var flag = el('span', { class: 'side-flag', 'aria-hidden': 'true', text: eng ? '🇰🇷' : '🇺🇸' });
-    var lbl = el('span', { class: 'side-lbl', text: eng ? 'Kor 보기' : 'Eng 보기' });
+    var back = !!state.flipped;
+    var s = sideNames();
+    var flag = el('span', { class: 'side-flag', 'aria-hidden': 'true', text: back ? '🇰🇷' : s.flag });
+    var lbl = el('span', { class: 'side-lbl', text: back ? 'Kor 보기' : (s.short + ' 보기') });
     var btn = el('button', {
-      class: 'side-toggle' + (eng ? ' is-back' : ''),
+      class: 'side-toggle' + (back ? ' is-back' : ''),
       type: 'button',
       'data-act': 'side-toggle',
-      'aria-pressed': eng ? 'true' : 'false',
-      'aria-label': eng ? '한국어 화면으로 전환' : '영어 화면으로 전환',
-      title: eng ? '한국어 화면으로 전환' : '영어 화면으로 전환'
+      'data-lang': state.lang,
+      'aria-pressed': back ? 'true' : 'false',
+      'aria-label': back ? '한국어 화면으로 전환' : (s.name + ' 화면으로 전환'),
+      title: back ? '한국어 화면으로 전환' : (s.name + ' 화면으로 전환')
     }, [flag, lbl]);
     press(btn, function () { setFlip(!state.flipped); });
     sideRefs = { btn: btn, flag: flag, lbl: lbl };
@@ -1221,13 +1421,14 @@
 
   function syncSideToggle() {
     if (!sideRefs.btn) { return; }
-    var eng = !!state.flipped;
-    if (sideRefs.lbl) { sideRefs.lbl.textContent = eng ? 'Kor 보기' : 'Eng 보기'; }
-    if (sideRefs.flag) { sideRefs.flag.textContent = eng ? '🇰🇷' : '🇺🇸'; }
-    sideRefs.btn.classList.toggle('is-back', eng);
-    sideRefs.btn.setAttribute('aria-pressed', eng ? 'true' : 'false');
-    sideRefs.btn.setAttribute('aria-label', eng ? '한국어 화면으로 전환' : '영어 화면으로 전환');
-    sideRefs.btn.setAttribute('title', eng ? '한국어 화면으로 전환' : '영어 화면으로 전환');
+    var back = !!state.flipped;
+    var s = sideNames();
+    if (sideRefs.lbl) { sideRefs.lbl.textContent = back ? 'Kor 보기' : (s.short + ' 보기'); }
+    if (sideRefs.flag) { sideRefs.flag.textContent = back ? '🇰🇷' : s.flag; }
+    sideRefs.btn.classList.toggle('is-back', back);
+    sideRefs.btn.setAttribute('aria-pressed', back ? 'true' : 'false');
+    sideRefs.btn.setAttribute('aria-label', back ? '한국어 화면으로 전환' : (s.name + ' 화면으로 전환'));
+    sideRefs.btn.setAttribute('title', back ? '한국어 화면으로 전환' : (s.name + ' 화면으로 전환'));
   }
 
   function sceneRow() {
@@ -1573,15 +1774,333 @@
   function renderStudy() {
     var root = refs.study;
     if (!root) { return; }
-    var sc = currentScene();
     clear(root);
     root.appendChild(langBar());
+    if (isIntroLang(state.lang)) { renderIntroStudy(root); return; }
+    renderEnglishStudy(root);
+  }
+
+  function renderEnglishStudy(root) {
+    var sc = currentScene();
     root.appendChild(sceneRow());
     root.appendChild(el('p', { class: 'scene-title', text: sc.title }));
     root.appendChild(metaStrip(sc));
     root.appendChild(buildCard(sc));
     setFlip(state.flipped);
     if (refs.brandSub) { refs.brandSub.textContent = sc.chapter + ' · ' + sc.turns.length + '문장'; }
+  }
+
+  /* ════════════════════════════════════════════════════
+     8-B. 5개국어 입문 — Kor 앞면 + 주력 언어 뒷면
+     ════════════════════════════════════════════════════ */
+  var miniRefs = {};
+
+  function introChip() {
+    return el('div', { class: 'chip is-on', 'data-intro': INTRO.id }, [
+      el('span', { class: 'chip-kicker', text: INTRO.chipKicker }),
+      el('span', { class: 'chip-label', text: INTRO.chipLabel })
+    ]);
+  }
+
+  function introSceneRow() {
+    var row = el('div', { class: 'scene-row' });
+    row.appendChild(el('div', { class: 'chips', 'aria-label': '학습 세트' }, [introChip()]));
+    row.appendChild(sideToggle());
+    return row;
+  }
+
+  function introMeta(L) {
+    var wrap = el('div', { class: 'meta' });
+    wrap.appendChild(el('span', { class: 'pill is-ok', text: '입문 샘플 · ' + INTRO.units.length + '단위' }));
+    wrap.appendChild(el('span', { class: 'pill', text: '주력 ' + L.flag + ' ' + L.name }));
+    wrap.appendChild(el('p', {
+      class: 'meta-note',
+      text: '단어 3 + 회화 3 + 문법 1 · 줄마다 국기 버튼을 누르면 발음과 소리가 바로 나와요. 카드를 탭하면 ' + L.name + ' 전체가 보여요.'
+    }));
+    return wrap;
+  }
+
+  function renderIntroStudy(root) {
+    var L = langDef(state.lang);
+    root.appendChild(introSceneRow());
+    root.appendChild(el('p', { class: 'scene-title', text: INTRO.title }));
+    root.appendChild(introMeta(L));
+    root.appendChild(buildIntroCard(L));
+    setFlip(state.flipped);
+    if (refs.brandSub) { refs.brandSub.textContent = '입문 · 5개국어 · ' + INTRO.units.length + '단위'; }
+  }
+
+  function introKoText(u) {
+    return u.sub ? u.ko + ' (' + u.sub + ')' : u.ko;
+  }
+
+  function introFrontUnit(u, idx) {
+    var li = el('li', { class: 'turn intro-unit', 'data-unit': u.id, 'data-kind': u.kind, 'data-side': 'front' });
+    li.appendChild(el('div', { class: 'turn-head' }, [
+      el('span', { class: 'badge kind-' + u.kind, text: u.kindLabel }),
+      el('span', { class: 'turn-no', text: (idx + 1) + '.' })
+    ]));
+    li.appendChild(el('p', { class: 'ko', text: introKoText(u) }));
+    if (u.hint) { li.appendChild(el('p', { class: 'unit-hint', text: u.hint })); }
+
+    var row = el('div', { class: 'mini-row', role: 'group', 'aria-label': introKoText(u) + ' 5개국어 보기' });
+    var btns = {};
+    for (var i = 0; i < INTRO_CODES.length; i++) {
+      (function (code) {
+        var L = langDef(code);
+        var b = el('button', {
+          class: 'mini',
+          type: 'button',
+          'data-unit': u.id,
+          'data-lang': code,
+          'aria-pressed': 'false',
+          'aria-label': L.name + '로 보기',
+          title: L.name
+        }, [el('span', { class: 'mini-flag', 'aria-hidden': 'true', text: L.flag })]);
+        press(b, function () { openMini(u, code, b); });
+        btns[code] = b;
+        row.appendChild(b);
+      })(INTRO_CODES[i]);
+    }
+    li.appendChild(row);
+
+    var panel = el('div', { class: 'mini-panel', hidden: true });
+    li.appendChild(panel);
+    miniRefs[u.id] = { panel: panel, btns: btns, current: null };
+    return li;
+  }
+
+  function openMini(u, code, btn) {
+    var r = miniRefs[u.id];
+    if (!r) { return; }
+    var d = u.t && u.t[code];
+    if (!d) { return; }
+    var L = langDef(code);
+    r.current = code;
+
+    clear(r.panel);
+    r.panel.appendChild(el('div', { class: 'mini-top' }, [
+      el('span', { class: 'mini-flag-lg', 'aria-hidden': 'true', text: L.flag }),
+      el('span', { class: 'mini-lang', text: L.name })
+    ]));
+    r.panel.appendChild(el('p', { class: 'mini-orig', lang: L.tts, text: d.text }));
+    r.panel.appendChild(el('p', { class: 'mini-pron' }, [
+      el('span', { class: 'mini-pron-lbl', text: '발음 ' }),
+      el('b', { class: 'mini-pron-bold', text: d.pron })
+    ]));
+    if (d.aux) { r.panel.appendChild(el('p', { class: 'mini-aux', text: d.aux })); }
+    if (d.ex) {
+      r.panel.appendChild(el('div', { class: 'mini-ex' }, [
+        el('p', { class: 'mini-ex-text', lang: L.tts, text: d.ex }),
+        el('p', { class: 'mini-ex-pron' }, [el('span', { text: '발음 ' }), el('b', { text: d.exPron || '' })]),
+        d.exKo ? el('p', { class: 'mini-ex-ko', text: d.exKo }) : null
+      ]));
+    }
+    if (d.tip) { r.panel.appendChild(el('p', { class: 'mini-tip', text: d.tip })); }
+    var note = el('p', { class: 'mini-note', hidden: true });
+    r.panel.appendChild(note);
+    r.panel.hidden = false;
+
+    var k;
+    for (k in r.btns) {
+      if (!Object.prototype.hasOwnProperty.call(r.btns, k)) { continue; }
+      r.btns[k].setAttribute('aria-pressed', k === code ? 'true' : 'false');
+      r.btns[k].classList.toggle('is-on', k === code);
+    }
+    if (btn && btn.classList) { btn.classList.add('is-on'); }
+
+    stopAll();
+    var res = speakLang(sayOf(d), code, state.speed, {});
+    if (res && res.missingVoice) {
+      note.textContent = '이 기기에 ' + L.name + ' 음성이 없어 기본 음성으로 읽어요 · Chrome 설정에서 음성 팩을 받으면 더 정확해요';
+      note.hidden = false;
+    }
+  }
+
+  function speakUnit(u, code, rate, unitId) {
+    var d = u.t && u.t[code];
+    if (!d) { return; }
+    stopAll();
+    highlight(unitId || u.id);
+    speakLang(sayOf(d), code, rate || state.speed, {
+      onend: function () { highlight(null); },
+      onerror: function () { highlight(null); }
+    });
+  }
+
+  function introBackUnit(u, idx, L) {
+    var d = u.t[L.code];
+    var li = el('li', { class: 'turn back-turn intro-back-unit', 'data-unit': u.id, 'data-kind': u.kind, 'data-side': 'back' });
+    li.appendChild(el('div', { class: 'turn-head' }, [
+      el('span', { class: 'badge kind-' + u.kind, text: u.kindLabel }),
+      el('span', { class: 'turn-no', text: (idx + 1) + '.' })
+    ]));
+    li.appendChild(el('p', { class: 'en orig', lang: L.tts, text: d.text }));
+    li.appendChild(el('p', { class: 'pron-line' }, [
+      el('span', { class: 'pron-lbl', text: '발음 ' }),
+      el('b', { class: 'pron-bold', text: d.pron })
+    ]));
+    if (d.aux) { li.appendChild(el('p', { class: 'aux-line', text: d.aux })); }
+    li.appendChild(el('p', { class: 'ko-sub', text: introKoText(u) }));
+    if (d.ex) {
+      li.appendChild(el('div', { class: 'mini-ex' }, [
+        el('p', { class: 'mini-ex-text', lang: L.tts, text: d.ex }),
+        el('p', { class: 'mini-ex-pron' }, [el('span', { text: '발음 ' }), el('b', { text: d.exPron || '' })]),
+        d.exKo ? el('p', { class: 'mini-ex-ko', text: d.exKo }) : null
+      ]));
+    }
+    if (d.tip) { li.appendChild(el('p', { class: 'unit-tip', text: d.tip })); }
+
+    var acts = el('div', { class: 'acts' });
+    var sayRate = el('span', { class: 'say-rate', text: speedLabel(state.speed) });
+    var say = el('button', {
+      class: 'btn small btn-say',
+      type: 'button',
+      'data-say-unit': u.id,
+      'aria-label': introKoText(u) + ' ' + L.name + '로 듣기'
+    }, [el('span', { class: 'say-ico', 'aria-hidden': 'true', text: '🔊' }), sayRate]);
+    press(say, function () { speakUnit(u, L.code, state.speed, u.id); });
+    acts.appendChild(say);
+    li.appendChild(acts);
+    return { node: li, rateSpan: sayRate };
+  }
+
+  function buildIntroCard(L) {
+    cardRefs = { flip: null, front: null, back: null, playBtn: null, playLbl: null, stopBtn: null, rateTag: null, frontTurns: {}, backTurns: {}, rateBtns: [], backRateBtns: [], sayRates: [] };
+    miniRefs = {};
+
+    var flip = el('div', { class: 'flip', id: 'flip' });
+    var front = el('section', { class: 'face front', 'aria-label': '한국어 화면' });
+    var back = el('section', { class: 'face back', 'aria-label': L.name + ' 화면' });
+
+    /* 앞면 — 한국어 한 화면(5개국어 탭이 모두 같은 내용) */
+    var toBack = press(el('button', { class: 'btn ghost small btn-flip', type: 'button', text: '↻ ' + L.name + ' 전체 보기' }), function () { setFlip(true); });
+    front.appendChild(el('div', { class: 'face-head' }, [
+      el('div', { class: 'face-title' }, [
+        el('span', { class: 'face-flag', 'aria-hidden': 'true', text: '🇰🇷' }),
+        el('div', {}, [el('b', { text: '한국어 → 5개국어' }), el('small', { text: '줄마다 국기 버튼을 누르면 발음과 소리가 바로 나와요' })])
+      ]),
+      toBack
+    ]));
+
+    var frontList = el('ol', { class: 'turns intro-units' });
+    for (var i = 0; i < INTRO.units.length; i++) {
+      frontList.appendChild(introFrontUnit(INTRO.units[i], i));
+    }
+    front.appendChild(frontList);
+    front.appendChild(el('p', { class: 'tap-hint', text: '빈 곳을 탭하면 ' + L.name + ' 전체가 보여요' }));
+
+    /* 뒷면 — 선택한 주력 언어 7단위 전체 */
+    var playLbl = el('span', { class: 'play-lbl', text: '🔊 전체 듣기' });
+    var rateTag = el('span', { class: 'rate-tag', text: speedLabel(state.speed) });
+    var playBtn = el('button', { class: 'btn primary small btn-play-all', type: 'button' }, [playLbl, rateTag]);
+    press(playBtn, function () { playAllIntro(); });
+    var stopBtn = el('button', { class: 'btn small btn-stop', type: 'button', text: '⏹ 정지', hidden: true });
+    press(stopBtn, function () { stopAll(); });
+    var toFront = press(el('button', { class: 'btn ghost small btn-flip', type: 'button', text: '↻ 한국어로 돌아가기' }), function () { setFlip(false); });
+
+    back.appendChild(el('div', { class: 'face-head' }, [
+      el('div', { class: 'face-title' }, [
+        el('span', { class: 'face-flag', 'aria-hidden': 'true', text: L.flag }),
+        el('div', {}, [el('b', { text: L.name }), el('small', { text: '원문 · 한글 발음 · 표현 팁' })])
+      ]),
+      el('div', { class: 'head-btns' }, [playBtn, stopBtn, toFront])
+    ]));
+
+    /* 4단 속도 */
+    var speedGroup = el('span', { class: 'spd-group', 'aria-label': '문장 배속' });
+    for (var s = 0; s < SPEEDS_BACK.length; s++) {
+      (function (sp) {
+        var b = el('button', {
+          class: 'spd spd-b' + (state.speed === sp.r ? ' is-on' : ''),
+          type: 'button',
+          'data-brate': String(sp.r),
+          'aria-pressed': state.speed === sp.r ? 'true' : 'false',
+          'aria-label': sp.label + ' 속도로 듣기',
+          text: sp.label
+        });
+        press(b, function () {
+          state.speed = sp.r;
+          saveUI();
+          syncSpeed();
+          toast('속도 ' + speedLabel(sp.r));
+        });
+        cardRefs.backRateBtns.push(b);
+        speedGroup.appendChild(b);
+      })(SPEEDS_BACK[s]);
+    }
+    back.appendChild(el('div', { class: 'back-speed' }, [
+      el('span', { class: 'seg-label', text: '속도' }),
+      speedGroup
+    ]));
+
+    var backList = el('ol', { class: 'turns intro-back-units' });
+    for (var j = 0; j < INTRO.units.length; j++) {
+      var bu = introBackUnit(INTRO.units[j], j, L);
+      backList.appendChild(bu.node);
+      cardRefs.backTurns[INTRO.units[j].id] = bu.node;
+      cardRefs.sayRates.push(bu.rateSpan);
+    }
+    back.appendChild(backList);
+    back.appendChild(el('div', { class: 'card-foot' }, [
+      el('p', { class: 'foot-note', text: '샘플 1세트 · 7단위 (단어 3 · 회화 3 · 문법 1)' })
+    ]));
+
+    flip.appendChild(front);
+    flip.appendChild(back);
+    flip.addEventListener('click', function (ev) {
+      var t = ev && ev.target;
+      if (t && t.closest) {
+        if (t.closest('button') || t.closest('a') || t.closest('input') || t.closest('textarea') || t.closest('.hint-pill')) { return; }
+      }
+      setFlip(!state.flipped);
+    });
+
+    cardRefs.flip = flip;
+    cardRefs.front = front;
+    cardRefs.back = back;
+    cardRefs.playBtn = playBtn;
+    cardRefs.playLbl = playLbl;
+    cardRefs.stopBtn = stopBtn;
+    cardRefs.rateTag = rateTag;
+    cardRefs.flipStage = el('div', { class: 'flip-stage' }, [flip]);
+    return cardRefs.flipStage;
+  }
+
+  function playAllIntro() {
+    var L = langDef(state.lang);
+    var units = INTRO.units;
+    stopAll();
+    if (!ttsAvailable()) {
+      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 발음이 나옵니다.');
+      return;
+    }
+    var token = { active: true };
+    playToken = token;
+    if (cardRefs.playBtn) { cardRefs.playBtn.classList.add('is-playing'); }
+    if (cardRefs.playLbl) { cardRefs.playLbl.textContent = '▶ 재생 중…'; }
+    if (cardRefs.stopBtn) { cardRefs.stopBtn.hidden = false; }
+    var i = 0;
+    function step() {
+      if (!token.active) { return; }
+      if (i >= units.length) { endPlay(); return; }
+      var u = units[i];
+      var d = u.t[L.code];
+      highlight(u.id);
+      speakLang(sayOf(d), L.code, state.speed, {
+        cancel: false,
+        onend: function () {
+          if (!token.active) { return; }
+          i += 1;
+          step();
+        },
+        onerror: function () {
+          if (!token.active) { return; }
+          endPlay();
+        }
+      });
+    }
+    step();
   }
 
   function selectScene(id) {
@@ -2441,6 +2960,7 @@
   function restoreUI() {
     var ui = (store && store.ui) || {};
     if (ui.sceneId && findScene(ui.sceneId)) { state.sceneId = ui.sceneId; }
+    if (ui.lang && langDef(ui.lang).code === ui.lang) { state.lang = ui.lang; }
     if (ui.theme === 'auto' || ui.theme === 'light' || ui.theme === 'dark') { state.theme = ui.theme; }
     if (typeof ui.speed === 'number' && ui.speed > 0) { state.speed = ui.speed; }
     if (ui.practiceScope === 'all' || ui.practiceScope === 'me') { state.practiceScope = ui.practiceScope; }
