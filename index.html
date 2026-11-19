@@ -1112,10 +1112,124 @@
   }
 
   /* ════════════════════════════════════════════════════
-     6. 음성 (Web Speech API — 영어 소리만)
+     6. 음성 — ① 원어민 MP3(1순위) → ② 기기 음성(같은 언어만)
+     · 모든 문장은 미리 만들어 둔 원어민 신경망 MP3 로 재생한다.
+       (폰의 speechSynthesis 는 음성 팩이 없으면 중국어를 일본어로
+        읽어 버리는 식의 엉뚱한 언어 낭독이 있어 1순위에서 뺐다)
+     · MP3 가 없거나 재생에 실패한 텍스트만 기기 음성으로 폴백한다.
+       단, v.lang 앞 두 글자가 정확히 같은 음성이 실제로 있을 때만 읽고
+       다른 언어 음성으로 대신 읽는 일은 절대 하지 않는다.
      ════════════════════════════════════════════════════ */
-  var voiceCache = null;
+  var AUDIO_BASE = 'audio/';
+  var audioEl = null;      /* 재사용 <audio> 1개 — 모바일에서 재생 잠금 해제 유지 */
+  var audioToken = null;
 
+  /* ── 파일 경로 규칙 ──
+     · 5개국어 입문: audio/intro-{언어}-{단위}.mp3   예) audio/intro-zh-w1.mp3
+     · 영어 회화:    audio/en-{장면}-{대사}.mp3       예) audio/en-cafe-sample-order-t1.mp3 */
+  function introAudioUrl(code, unitId) {
+    return AUDIO_BASE + 'intro-' + code + '-' + unitId + '.mp3';
+  }
+
+  function sceneAudioUrl(sceneId, turnId) {
+    return AUDIO_BASE + 'en-' + sceneId + '-' + turnId + '.mp3';
+  }
+
+  /* 단위의 언어별 클립 경로 (데이터에 audio 가 있으면 그 값을 우선) */
+  function unitClip(u, code) {
+    var d = (u && u.t) ? u.t[code] : null;
+    if (!d) { return ''; }
+    return d.audio || introAudioUrl(code, u.id);
+  }
+
+  /* 대사의 클립 경로 (데이터에 audio 가 있으면 그 값을 우선) */
+  function turnClip(sc, t) {
+    if (!t) { return ''; }
+    if (t.audio) { return t.audio; }
+    return sceneAudioUrl((sc && sc.id) || state.sceneId, t.id);
+  }
+
+  function audioAvailable() {
+    return typeof window.Audio === 'function';
+  }
+
+  function clampRate(r) {
+    var n = Number(r);
+    if (!isFinite(n) || n <= 0) { return 1; }
+    if (n < 0.5) { return 0.5; }
+    if (n > 2) { return 2; }
+    return n;
+  }
+
+  function getAudioEl() {
+    if (!audioEl) {
+      audioEl = new window.Audio();
+      try { audioEl.preload = 'auto'; } catch (e) { /* noop */ }
+    }
+    return audioEl;
+  }
+
+  function stopAudio() {
+    if (audioToken) { audioToken.active = false; audioToken = null; }
+    if (!audioEl) { return; }
+    try { audioEl.onended = null; } catch (e1) { /* noop */ }
+    try { audioEl.onerror = null; } catch (e2) { /* noop */ }
+    try { audioEl.pause(); } catch (e3) { /* noop */ }
+    try { audioEl.currentTime = 0; } catch (e4) { /* noop */ }
+  }
+
+  /* MP3 클립 1개 재생 — 시작했으면 true, 재생 장치/경로가 없으면 false */
+  function playClip(url, rate, opts) {
+    opts = opts || {};
+    if (!url || !audioAvailable()) { return false; }
+    stopAudio();
+    var a = getAudioEl();
+    var token = { active: true, url: url };
+    audioToken = token;
+    var done = false;
+    function finish(okFlag) {
+      if (done) { return; }
+      done = true;
+      try { a.onended = null; } catch (e0) { /* noop */ }
+      try { a.onerror = null; } catch (e1) { /* noop */ }
+      if (!token.active) { return; }
+      token.active = false;
+      if (audioToken === token) { audioToken = null; }
+      if (okFlag) {
+        if (opts.onend) { opts.onend(); }
+      } else if (opts.onerror) {
+        opts.onerror();
+      }
+    }
+    a.onended = function () { finish(true); };
+    a.onerror = function () { finish(false); };
+    try {
+      a.src = url;
+      a.playbackRate = clampRate(rate);
+    } catch (e2) {
+      finish(false);
+      return false;
+    }
+    try { if (a.load) { a.load(); } } catch (e3) { /* noop */ }
+    var p = null;
+    try {
+      p = a.play();
+    } catch (e4) {
+      finish(false);
+      return false;
+    }
+    if (p && typeof p.then === 'function') {
+      p.then(function () {
+        /* 로드 후 배속이 초기화되는 브라우저가 있어 한 번 더 확정 */
+        try { a.playbackRate = clampRate(rate); } catch (e5) { /* noop */ }
+      }, function () {
+        finish(false);
+      });
+    }
+    return true;
+  }
+
+  /* ── 기기 음성(폴백 전용) ── */
   function ttsAvailable() {
     return !!(window.speechSynthesis && window.SpeechSynthesisUtterance);
   }
@@ -1131,7 +1245,8 @@
     return String(tag == null ? '' : tag).toLowerCase().replace(/_/g, '-');
   }
 
-  /* 해당 언어(예: it-IT) 음성 찾기 — 정확한 태그 우선, 없으면 같은 언어의 다른 지역 */
+  /* 해당 언어(예: it-IT) 음성 — 정확한 태그 우선, 없으면 같은 언어의 다른 지역만.
+     다른 언어 음성은 절대 돌려주지 않는다. */
   function voiceFor(tag) {
     var want = normTag(tag);
     var base = want.split('-')[0];
@@ -1147,26 +1262,29 @@
     return null;
   }
 
-  function pickVoice() {
-    if (voiceCache) { return voiceCache; }
-    var v = voiceFor('en-US');
-    if (v) { voiceCache = v; }
-    return v;
-  }
-
   function cancelSpeech() {
     if (!ttsAvailable()) { return; }
     try { window.speechSynthesis.cancel(); } catch (e) { /* noop */ }
   }
 
-  /* 여러 언어 공용 재생기 — langCode 는 LANGS 의 code('en','it',…) */
-  function speakLang(text, langCode, rate, opts) {
+  /* 같은 언어 음성이 실제로 있을 때만 읽는다. 없으면 안내만 하고 멈춘다. */
+  function speakNative(text, langCode, rate, opts) {
     opts = opts || {};
     var L = langDef(langCode);
     if (!ttsAvailable()) {
-      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 발음이 나옵니다.');
+      if (!opts.silent) {
+        toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
+      }
       if (opts.onerror) { opts.onerror(); }
-      return { played: false, unsupported: true, missingVoice: false };
+      return { played: false, via: 'none', unsupported: true, missingVoice: false };
+    }
+    var v = voiceFor(L.tts);
+    if (!v) {
+      if (!opts.silent) {
+        toast(L.name + ' 음성이 이 기기에 없어요', '다른 언어로 대신 읽지 않습니다. Chrome 설정에서 ' + L.name + ' 음성 팩을 받아 주세요.');
+      }
+      if (opts.onerror) { opts.onerror(); }
+      return { played: false, via: 'none', unsupported: false, missingVoice: true };
     }
     var synth = window.speechSynthesis;
     if (opts.cancel !== false) {
@@ -1176,11 +1294,9 @@
     }
     var u = new window.SpeechSynthesisUtterance(String(text));
     u.lang = L.tts;
-    u.rate = rate || 1;
+    u.rate = clampRate(rate);
     u.pitch = 1;
-    var v = voiceFor(L.tts);
-    if (v) { u.voice = v; }
-    var hasAny = voicesList().length > 0;
+    u.voice = v;
     var done = false;
     u.onend = function () {
       if (done) { return; }
@@ -1194,11 +1310,29 @@
     };
     try {
       synth.speak(u);
-    } catch (e) {
+    } catch (e3) {
       if (opts.onerror) { opts.onerror(); }
-      return { played: false, unsupported: true, missingVoice: false };
+      return { played: false, via: 'none', unsupported: true, missingVoice: false };
     }
-    return { played: true, unsupported: false, missingVoice: !v && hasAny };
+    return { played: true, via: 'tts', unsupported: false, missingVoice: false };
+  }
+
+  /* 여러 언어 공용 재생기 — langCode 는 LANGS 의 code('en','it',…)
+     opts.audio 에 MP3 경로가 있으면 그것부터, 실패하면 기기 음성으로. */
+  function speakLang(text, langCode, rate, opts) {
+    opts = opts || {};
+    var url = opts.audio || '';
+    if (url) {
+      var started = playClip(url, rate, {
+        onend: opts.onend,
+        onerror: function () {
+          var res = speakNative(text, langCode, rate, opts);
+          if (opts.onfallback) { opts.onfallback(res); }
+        }
+      });
+      if (started) { return { played: true, via: 'mp3', unsupported: false, missingVoice: false }; }
+    }
+    return speakNative(text, langCode, rate, opts);
   }
 
   function speak(text, rate, opts) {
@@ -1219,10 +1353,14 @@
     }
   }
 
-  function speakOne(text, rate, turnId) {
+  /* 대사 1개 듣기 — 대사 객체를 받는다 (sc 를 주면 그 장면의 클립을 쓴다) */
+  function speakOne(t, rate, sc) {
+    if (!t) { return; }
+    var scene = sc || findScene(state.sceneId) || CONTENT.scenes[0];
     stopAll();
-    highlight(turnId || null);
-    speak(text, rate, {
+    highlight(t.id || null);
+    speakLang(t.en, 'en', rate, {
+      audio: turnClip(scene, t),
       onend: function () { highlight(null); },
       onerror: function () { highlight(null); }
     });
@@ -1237,6 +1375,7 @@
 
   function stopAll() {
     if (playToken) { playToken.active = false; playToken = null; }
+    stopAudio();
     cancelSpeech();
     highlight(null);
     restorePlayBtn();
@@ -1251,8 +1390,8 @@
   function playAll() {
     var sc = currentScene();
     stopAll();
-    if (!ttsAvailable()) {
-      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 영어 발음이 나옵니다.');
+    if (!audioAvailable() && !ttsAvailable()) {
+      toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
       return;
     }
     var token = { active: true };
@@ -1266,7 +1405,8 @@
       if (i >= sc.turns.length) { endPlay(); return; }
       var t = sc.turns[i];
       highlight(t.id);
-      speak(t.en, state.speed, {
+      speakLang(t.en, 'en', state.speed, {
+        audio: turnClip(sc, t),
         cancel: false,
         onend: function () {
           if (!token.active) { return; }
@@ -1515,7 +1655,7 @@
       el('span', { class: 'say-ico', 'aria-hidden': 'true', text: '🔊' }),
       sayRate
     ]);
-    press(say, function () { speakOne(t.en, state.speed, t.id); });
+    press(say, function () { speakOne(t, state.speed); });
     acts.appendChild(say);
 
     var group = el('span', { class: 'spd-group', 'aria-label': '배속' });
@@ -1534,7 +1674,7 @@
           state.speed = r;
           saveUI();
           syncSpeed();
-          speakOne(t.en, r, t.id);
+          speakOne(t, r);
         });
         rates.push(b);
         group.appendChild(b);
@@ -1595,7 +1735,7 @@
           state.speed = s.r;
           saveUI();
           syncSpeed();
-          speakOne(t.en, s.r, t.id);
+          speakOne(t, s.r);
         });
         backRates.push(b);
         group.appendChild(b);
@@ -1911,11 +2051,15 @@
     if (btn && btn.classList) { btn.classList.add('is-on'); }
 
     stopAll();
-    var res = speakLang(sayOf(d), code, state.speed, {});
-    if (res && res.missingVoice) {
-      note.textContent = '이 기기에 ' + L.name + ' 음성이 없어 발음이 어색할 수 있어요 · Chrome 설정에서 음성 팩을 받으면 더 정확해요';
+    function showNoVoice() {
+      note.textContent = '이 기기에 ' + L.name + ' 음성이 없어요 · 다른 언어로 읽지 않습니다. Chrome 설정에서 ' + L.name + ' 음성 팩을 받아 주세요';
       note.hidden = false;
     }
+    var res = speakLang(sayOf(d), code, state.speed, {
+      audio: unitClip(u, code),
+      onfallback: function (r2) { if (r2 && r2.missingVoice) { showNoVoice(); } }
+    });
+    if (res && res.missingVoice) { showNoVoice(); }
   }
 
   function speakUnit(u, code, rate, unitId) {
@@ -1924,6 +2068,7 @@
     stopAll();
     highlight(unitId || u.id);
     speakLang(sayOf(d), code, rate || state.speed, {
+      audio: unitClip(u, code),
       onend: function () { highlight(null); },
       onerror: function () { highlight(null); }
     });
@@ -2072,8 +2217,8 @@
     var L = langDef(state.lang);
     var units = INTRO.units;
     stopAll();
-    if (!ttsAvailable()) {
-      toast('이 브라우저는 음성 재생을 지원하지 않아요', 'Chrome · Safari · Edge에서 열면 발음이 나옵니다.');
+    if (!audioAvailable() && !ttsAvailable()) {
+      toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
       return;
     }
     var token = { active: true };
@@ -2089,6 +2234,7 @@
       var d = u.t[L.code];
       highlight(u.id);
       speakLang(sayOf(d), L.code, state.speed, {
+        audio: unitClip(u, L.code),
         cancel: false,
         onend: function () {
           if (!token.active) { return; }
@@ -2208,7 +2354,7 @@
         el('p', { class: 'ctx-ko', text: prev.ko })
       ]);
       var b = press(el('button', { class: 'btn ghost small btn-say', type: 'button', 'aria-label': '직전 대사 듣기', text: '🔊 듣기' }), function () {
-        speakOne(prev.en, state.speed);
+        speakOne(prev, state.speed, sc);
       });
       ctx.appendChild(el('div', { class: 'acts' }, [b]));
       card.appendChild(ctx);
@@ -2252,7 +2398,7 @@
         var ok = normalize(val) === normalize(turn.en);
         p.phase = ok ? 'right' : 'wrong';
         p.results[p.idx] = { id: turn.id, ok: ok, input: val };
-        if (ok) { speakOne(turn.en, state.speed, turn.id); }
+        if (ok) { speakOne(turn, state.speed, sc); }
         renderPractice();
       }
       card.appendChild(input);
@@ -2270,7 +2416,7 @@
         el('p', { class: 'verdict-answer', text: turn.en })
       ]);
       var replay = press(el('button', { class: 'btn small btn-say', type: 'button', text: '🔊 다시 듣기' }), function () {
-        speakOne(turn.en, state.speed, turn.id);
+        speakOne(turn, state.speed, sc);
       });
       var nextBtn = press(el('button', { class: 'btn primary btn-next', type: 'button', text: p.idx + 1 >= p.queue.length ? '결과 보기' : '다음으로 ▶' }), function () {
         practiceNext();
@@ -2577,7 +2723,7 @@
         q.results[q.idx] = { ok: ok, input: val };
         q.phase = 'feedback';
         q.lastOk = ok;
-        if (ok) { speakOne(turn.en, state.speed, turn.id); }
+        if (ok) { speakOne(turn, state.speed, sc); }
         updateBadge();
         renderQuiz();
       }
@@ -2597,7 +2743,7 @@
         el('p', { class: 'verdict-answer', text: turn.en })
       ]);
       box.appendChild(el('div', { class: 'verdict-actions' }, [
-        press(el('button', { class: 'btn small btn-say', type: 'button', text: '🔊 다시 듣기' }), function () { speakOne(turn.en, state.speed, turn.id); }),
+        press(el('button', { class: 'btn small btn-say', type: 'button', text: '🔊 다시 듣기' }), function () { speakOne(turn, state.speed, sc); }),
         press(el('button', { class: 'btn primary btn-next', type: 'button', text: q.idx + 1 >= q.items.length ? '성적 보기' : '다음 문항 ▶' }), function () { quizNext(); })
       ]));
     } else {
@@ -2620,7 +2766,7 @@
         ])
       ]);
       box.appendChild(el('div', { class: 'verdict-actions' }, [
-        press(el('button', { class: 'btn small btn-say', type: 'button', text: '🔊 정답 듣기' }), function () { speakOne(turn.en, state.speed, turn.id); }),
+        press(el('button', { class: 'btn small btn-say', type: 'button', text: '🔊 정답 듣기' }), function () { speakOne(turn, state.speed, sc); }),
         press(el('button', { class: 'btn primary btn-next', type: 'button', text: q.idx + 1 >= q.items.length ? '성적 보기' : '다음 문항 ▶' }), function () { quizNext(); })
       ]));
     }
@@ -2977,8 +3123,9 @@
     bindTabs();
     bindTheme();
     installPWA();
+    /* 기기 음성 폴백용 — 음성 목록은 호출 때마다 getVoices() 로 읽는다 */
     if (window.speechSynthesis && window.speechSynthesis.addEventListener) {
-      try { window.speechSynthesis.addEventListener('voiceschanged', function () { voiceCache = null; }); } catch (e) { /* noop */ }
+      try { window.speechSynthesis.addEventListener('voiceschanged', function () { /* 목록은 매번 새로 읽음 */ }); } catch (e) { /* noop */ }
     }
     switchTab(state.tab, true);
   }
