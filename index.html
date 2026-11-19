@@ -1912,7 +1912,7 @@
     stopAll();
     var res = speakLang(sayOf(d), code, state.speed, {});
     if (res && res.missingVoice) {
-      note.textContent = '이 기기에 ' + L.name + ' 음성이 없어 기본 음성으로 읽어요 · Chrome 설정에서 음성 팩을 받으면 더 정확해요';
+      note.textContent = '이 기기에 ' + L.name + ' 음성이 없어 발음이 어색할 수 있어요 · Chrome 설정에서 음성 팩을 받으면 더 정확해요';
       note.hidden = false;
     }
   }
