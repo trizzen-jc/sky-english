@@ -1180,6 +1180,7 @@
     u.pitch = 1;
     var v = voiceFor(L.tts);
     if (v) { u.voice = v; }
+    var hasAny = voicesList().length > 0;
     var done = false;
     u.onend = function () {
       if (done) { return; }
@@ -1197,7 +1198,7 @@
       if (opts.onerror) { opts.onerror(); }
       return { played: false, unsupported: true, missingVoice: false };
     }
-    return { played: true, unsupported: false, missingVoice: !v };
+    return { played: true, unsupported: false, missingVoice: !v && hasAny };
   }
 
   function speak(text, rate, opts) {
