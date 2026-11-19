@@ -57,6 +57,16 @@
     --shadow: 0 12px 34px rgba(16, 22, 35, 0.09);
     --shadow-sm: 0 2px 8px rgba(16, 22, 35, 0.06);
     --radius: 20px;
+    /* 카드 앞면(Kor) / 뒷면(Eng) 바탕 구분 */
+    --face-kor-bg: #fffdf7;
+    --face-kor-line: #eee4d0;
+    --face-eng-bg: #eef3ff;
+    --face-eng-line: #c7d7fe;
+    --face-eng-row: #ffffff;
+    --side-btn-1: #2f6bff;
+    --side-btn-2: #1d4ed8;
+    --side-btn-ink: #ffffff;
+    --side-btn-shadow: 0 6px 18px rgba(47, 107, 255, 0.32);
   }
   :root[data-theme="dark"] {
     --bg: #0a0d14;
@@ -85,6 +95,16 @@
     --nav-bg: rgba(19, 26, 38, 0.9);
     --shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    /* 카드 앞면(Kor) / 뒷면(Eng) 바탕 구분 — 다크 */
+    --face-kor-bg: #161b26;
+    --face-kor-line: #2b3547;
+    --face-eng-bg: #1b2438;
+    --face-eng-line: #38496f;
+    --face-eng-row: #232d45;
+    --side-btn-1: #3f74f0;
+    --side-btn-2: #2550c0;
+    --side-btn-ink: #ffffff;
+    --side-btn-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
   }
 
   * { box-sizing: border-box; }
@@ -201,6 +221,25 @@
   .chip .chip-label { font-size: 13.5px; font-weight: 700; color: var(--text); }
   .chip.is-on { border-color: var(--brand); background: var(--brand-soft); box-shadow: var(--shadow-sm); }
 
+  /* ── 장면 칩 줄 + 큼직한 Eng/Kor 전환 버튼 ───────────── */
+  .scene-row { display: flex; align-items: stretch; gap: 8px; padding: 2px 2px 10px; }
+  .scene-row .chips { flex: 1 1 auto; min-width: 0; padding: 0; }
+  .side-toggle {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-width: 116px; padding: 10px 16px; border-radius: 14px;
+    border: 1px solid transparent;
+    background: linear-gradient(150deg, var(--side-btn-1) 0%, var(--side-btn-2) 100%);
+    color: var(--side-btn-ink);
+    font-size: 15px; font-weight: 800; letter-spacing: -0.01em;
+    box-shadow: var(--side-btn-shadow);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  }
+  .side-toggle .side-flag { font-size: 18px; line-height: 1; }
+  .side-toggle .side-lbl { line-height: 1.15; }
+  .side-toggle:active { transform: scale(0.97); }
+  .side-toggle:focus-visible { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
+
   .scene-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; padding: 0 2px 4px; }
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 2px 12px; }
   .pill {
@@ -235,8 +274,8 @@
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
-  .face.front { transform: rotateY(0deg); }
-  .face.back { transform: rotateY(180deg); }
+  .face.front { transform: rotateY(0deg); background: var(--face-kor-bg); border-color: var(--face-kor-line); }
+  .face.back { transform: rotateY(180deg); background: var(--face-eng-bg); border-color: var(--face-eng-line); }
   /* 보이지 않는 면은 터치를 절대 받지 않는다 */
   .face { pointer-events: none; }
   .flip:not(.is-flipped) .face.front { pointer-events: auto; }
@@ -260,6 +299,9 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   }
   .turn.me { background: var(--me-row); }
+  /* 영어(뒷면) 카드에서는 대화 줄을 밝게 띄워 인디고 바탕과 구분 */
+  .face.back .turn { background: var(--face-eng-row); }
+  .face.back .turn.me { background: var(--me-row); }
   .turn.is-speaking { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
   .turn-head { display: flex; align-items: center; gap: 6px; }
   .badge {
@@ -1157,6 +1199,44 @@
     return wrap;
   }
 
+  /* ── 큰 Eng/Kor 보기 버튼 (장면 칩 줄 오른쪽) ─────────── */
+  var sideRefs = { btn: null, flag: null, lbl: null };
+
+  function sideToggle() {
+    var eng = !!state.flipped;
+    var flag = el('span', { class: 'side-flag', 'aria-hidden': 'true', text: eng ? '🇰🇷' : '🇺🇸' });
+    var lbl = el('span', { class: 'side-lbl', text: eng ? 'Kor 보기' : 'Eng 보기' });
+    var btn = el('button', {
+      class: 'side-toggle' + (eng ? ' is-back' : ''),
+      type: 'button',
+      'data-act': 'side-toggle',
+      'aria-pressed': eng ? 'true' : 'false',
+      'aria-label': eng ? '한국어 화면으로 전환' : '영어 화면으로 전환',
+      title: eng ? '한국어 화면으로 전환' : '영어 화면으로 전환'
+    }, [flag, lbl]);
+    press(btn, function () { setFlip(!state.flipped); });
+    sideRefs = { btn: btn, flag: flag, lbl: lbl };
+    return btn;
+  }
+
+  function syncSideToggle() {
+    if (!sideRefs.btn) { return; }
+    var eng = !!state.flipped;
+    if (sideRefs.lbl) { sideRefs.lbl.textContent = eng ? 'Kor 보기' : 'Eng 보기'; }
+    if (sideRefs.flag) { sideRefs.flag.textContent = eng ? '🇰🇷' : '🇺🇸'; }
+    sideRefs.btn.classList.toggle('is-back', eng);
+    sideRefs.btn.setAttribute('aria-pressed', eng ? 'true' : 'false');
+    sideRefs.btn.setAttribute('aria-label', eng ? '한국어 화면으로 전환' : '영어 화면으로 전환');
+    sideRefs.btn.setAttribute('title', eng ? '한국어 화면으로 전환' : '영어 화면으로 전환');
+  }
+
+  function sceneRow() {
+    var row = el('div', { class: 'scene-row' });
+    row.appendChild(sceneChips());
+    row.appendChild(sideToggle());
+    return row;
+  }
+
   function nextReview(sc) {
     var lr = learnedOf(sc.id);
     if (!lr) { return null; }
@@ -1460,6 +1540,7 @@
     if (!cardRefs.flip) { return; }
     if (state.flipped) { stopAll(); }
     cardRefs.flip.classList.toggle('is-flipped', state.flipped);
+    syncSideToggle();
     cardRefs.front.setAttribute('aria-hidden', state.flipped ? 'true' : 'false');
     cardRefs.back.setAttribute('aria-hidden', state.flipped ? 'false' : 'true');
     if (cardRefs.front.setAttribute) {
@@ -1495,7 +1576,7 @@
     var sc = currentScene();
     clear(root);
     root.appendChild(langBar());
-    root.appendChild(sceneChips());
+    root.appendChild(sceneRow());
     root.appendChild(el('p', { class: 'scene-title', text: sc.title }));
     root.appendChild(metaStrip(sc));
     root.appendChild(buildCard(sc));
