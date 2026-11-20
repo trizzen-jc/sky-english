@@ -304,7 +304,7 @@
   .face.back .turn { background: var(--face-eng-row); }
   .face.back .turn.me { background: var(--me-row); }
   .turn.is-speaking { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
-  .turn-head { display: flex; align-items: center; gap: 6px; }
+  .turn-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .badge {
     display: inline-flex; align-items: center;
     font-size: 10.5px; font-weight: 800; letter-spacing: 0.01em;
@@ -325,6 +325,26 @@
     font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em;
   }
   .hint-pill::before { content: "💡 "; }
+  /* ── 문장별 자동 반복 [3][5][10] ─────────────────────── */
+  .rep-row {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-left: auto; padding-left: 6px;
+  }
+  .rep-lbl { font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
+  .rep {
+    min-height: 27px; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--muted); font-size: 11px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .rep:active { transform: scale(0.95); }
+  .rep.is-on {
+    background: var(--brand); border-color: var(--brand); color: #fff;
+    box-shadow: 0 4px 12px rgba(47, 107, 255, 0.28);
+  }
+  .rep:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   .acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-top: 9px; }
   .btn-clip { white-space: nowrap; }
   @media (max-width: 430px) {
@@ -1429,6 +1449,137 @@
     });
   }
 
+  /* ── 문장별 자동 반복 [3][5][10] ────────────────────────
+     한 문장을 3·5·10회 연속 재생한다(회차 사이 0.5초).
+     진행 중인 버튼은 '3 · 1/3' 처럼 진행을 보여 주고,
+     같은 버튼을 다시 누르거나 다른 소리를 내면 즉시 멈춘다. */
+  var REPEAT_COUNTS = [3, 5, 10];
+  var REPEAT_GAP = 500;
+  var repState = null;
+
+  /* 반복 상태만 정리한다(오디오·기기 음성은 부르는 쪽에서 멈춘다) */
+  function clearRepeat() {
+    var s = repState;
+    if (!s) { return; }
+    repState = null;
+    if (s.token) { s.token.active = false; }
+    if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    repLabel(s.btn, 0, s.n);
+    if (s.turnId) { highlight(null); }
+  }
+
+  /* 사용자가 직접 멈춤 — 타이머·MP3·기기 음성까지 */
+  function stopRepeat() {
+    if (!repState) { return; }
+    clearRepeat();
+    stopAudio();
+    cancelSpeech();
+  }
+
+  function repLabel(btn, i, n) {
+    if (!btn || !btn.setAttribute) { return; }
+    var base = btn.getAttribute('data-rep-label') || ('[' + btn.getAttribute('data-repeat') + ']');
+    var count = String(n || btn.getAttribute('data-repeat') || '');
+    if (!i) {
+      btn.textContent = base;
+      btn.classList.remove('is-on');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', count + '회 자동 반복');
+      return;
+    }
+    btn.textContent = count + ' · ' + i + '/' + count;
+    btn.classList.add('is-on');
+    btn.setAttribute('aria-pressed', 'true');
+    btn.setAttribute('aria-label', count + '회 자동 반복 중 ' + i + '/' + count + ' — 누르면 정지');
+  }
+
+  /* play(opts) 는 한 회차를 재생하고 opts.onend / opts.onerror 를 부른다 */
+  function startRepeat(btn, count, play, turnId) {
+    if (!btn || !count || !play) { return false; }
+    stopAll();
+    var s = { btn: btn, n: count, i: 0, timer: null, token: null, play: play, turnId: turnId || null };
+    repState = s;
+    if (s.turnId) { highlight(s.turnId); }
+    stepRepeat(s);
+    return true;
+  }
+
+  function stepRepeat(s) {
+    if (repState !== s) { return; }
+    s.i += 1;
+    repLabel(s.btn, s.i, s.n);
+    var token = { active: true };
+    s.token = token;
+    s.play({
+      onend: function () {
+        if (repState !== s || !token.active) { return; }
+        token.active = false;
+        if (s.i >= s.n) { finishRepeat(s, false); return; }
+        s.timer = setTimeout(function () {
+          s.timer = null;
+          stepRepeat(s);
+        }, REPEAT_GAP);
+      },
+      onerror: function () {
+        if (repState !== s || !token.active) { return; }
+        token.active = false;
+        finishRepeat(s, true);
+      }
+    });
+  }
+
+  function finishRepeat(s, failed) {
+    if (repState === s) {
+      repState = null;
+      if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+      repLabel(s.btn, 0, s.n);
+      if (s.turnId) { highlight(null); }
+    }
+    if (failed) { toast('반복을 멈췄어요', '이 문장 소리를 재생하지 못했습니다.'); }
+  }
+
+  /* 반복 버튼 한 묶음 — 한국어 표현 윗줄(화자 라벨 줄)에 붙는다 */
+  function repeatRow(makePlay, turnId) {
+    var row = el('div', { class: 'rep-row', role: 'group', 'aria-label': '자동 반복' });
+    row.appendChild(el('span', { class: 'rep-lbl', text: '반복' }));
+    var btns = [];
+    for (var i = 0; i < REPEAT_COUNTS.length; i++) {
+      (function (n) {
+        var b = el('button', {
+          class: 'rep',
+          type: 'button',
+          'data-repeat': String(n),
+          'data-rep-label': '[' + n + ']',
+          'aria-pressed': 'false',
+          'aria-label': n + '회 자동 반복',
+          title: n + '회 연속 듣기',
+          text: '[' + n + ']'
+        });
+        /* 카드 뒤집기와 겹치지 않도록 클릭을 여기서 끊는다(press 가 stopPropagation) */
+        press(b, function (ev) {
+          if (ev && ev.stopPropagation) { ev.stopPropagation(); }
+          if (repState && repState.btn === b) { stopRepeat(); return; }
+          startRepeat(b, n, makePlay(n), turnId);
+        });
+        btns.push(b);
+        row.appendChild(b);
+      })(REPEAT_COUNTS[i]);
+    }
+    row.repBtns = btns;
+    return row;
+  }
+
+  /* 한 문장을 현재 배속으로 한 번 재생 — 반복 엔진이 부른다 */
+  function repeatTurnPlay(t, sc) {
+    return function (opts) {
+      speakLang(t.en, 'en', state.speed, {
+        audio: turnClip(sc, t),
+        onend: opts.onend,
+        onerror: opts.onerror
+      });
+    };
+  }
+
   function restorePlayBtn() {
     if (!cardRefs.playBtn) { return; }
     cardRefs.playBtn.classList.remove('is-playing');
@@ -1438,6 +1589,7 @@
 
   function stopAll() {
     if (playToken) { playToken.active = false; playToken = null; }
+    clearRepeat();
     stopAudio();
     cancelSpeech();
     highlight(null);
@@ -1703,7 +1855,10 @@
 
   function frontTurn(t, idx) {
     var li = el('li', { class: 'turn ' + t.speaker, 'data-turn': t.id, 'data-side': 'front' });
-    li.appendChild(el('div', { class: 'turn-head' }, [badgeFor(t), el('span', { class: 'turn-no', text: (idx + 1) + '.' })]));
+    var head = el('div', { class: 'turn-head' }, [badgeFor(t), el('span', { class: 'turn-no', text: (idx + 1) + '.' })]);
+    var sc0 = currentScene();
+    head.appendChild(repeatRow(function () { return repeatTurnPlay(t, sc0); }, t.id));
+    li.appendChild(head);
     li.appendChild(el('p', { class: 'ko', text: t.ko }));
 
     var pill = el('p', { class: 'hint-pill', hidden: true, text: t.hint });
@@ -1978,6 +2133,8 @@
   function renderStudy() {
     var root = refs.study;
     if (!root) { return; }
+    /* 장면·언어·탭을 바꾸면 진행 중인 반복·전체 듣기를 먼저 끊는다 */
+    stopAll();
     clear(root);
     root.appendChild(langBar());
     if (isIntroLang(state.lang)) { renderIntroStudy(root); return; }
@@ -2040,10 +2197,12 @@
 
   function introFrontUnit(u, idx) {
     var li = el('li', { class: 'turn intro-unit', 'data-unit': u.id, 'data-kind': u.kind, 'data-side': 'front' });
-    li.appendChild(el('div', { class: 'turn-head' }, [
+    var head = el('div', { class: 'turn-head' }, [
       el('span', { class: 'badge kind-' + u.kind, text: u.kindLabel }),
       el('span', { class: 'turn-no', text: (idx + 1) + '.' })
-    ]));
+    ]);
+    head.appendChild(repeatRow(function () { return repeatUnitPlay(u); }, u.id));
+    li.appendChild(head);
     li.appendChild(el('p', { class: 'ko', text: introKoText(u) }));
     if (u.hint) { li.appendChild(el('p', { class: 'unit-hint', text: u.hint })); }
 
@@ -2135,6 +2294,23 @@
       onend: function () { highlight(null); },
       onerror: function () { highlight(null); }
     });
+  }
+
+  /* 한 단위를 지금 고른 주력 언어로 한 번 재생 — 반복 엔진이 부른다 */
+  function repeatUnitPlay(u) {
+    return function (opts) {
+      var code = state.lang;
+      var d = u.t && u.t[code];
+      if (!d) {
+        if (opts.onerror) { opts.onerror(); }
+        return;
+      }
+      speakLang(sayOf(d), code, state.speed, {
+        audio: unitClip(u, code),
+        onend: opts.onend,
+        onerror: opts.onerror
+      });
+    };
   }
 
   function introBackUnit(u, idx, L) {
