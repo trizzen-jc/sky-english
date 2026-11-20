@@ -1488,17 +1488,18 @@
     if (!btn || !btn.setAttribute) { return; }
     var base = btn.getAttribute('data-rep-label') || String(btn.getAttribute('data-repeat') || '');
     var count = String(n || btn.getAttribute('data-repeat') || '');
+    var kind = btn.getAttribute('data-rep-kind') || '자동 반복';
     if (!i) {
       btn.textContent = base;
       btn.classList.remove('is-on');
       btn.setAttribute('aria-pressed', 'false');
-      btn.setAttribute('aria-label', count + '회 자동 반복');
+      btn.setAttribute('aria-label', count + '회 ' + kind);
       return;
     }
     btn.textContent = count + ' · ' + i + '/' + count;
     btn.classList.add('is-on');
     btn.setAttribute('aria-pressed', 'true');
-    btn.setAttribute('aria-label', count + '회 자동 반복 중 ' + i + '/' + count + ' — 누르면 정지');
+    btn.setAttribute('aria-label', count + '회 ' + kind + ' 중 ' + i + '/' + count + ' — 누르면 정지');
   }
 
   /* play(opts) 는 한 회차를 재생하고 opts.onend / opts.onerror 를 부른다 */
@@ -1738,6 +1739,7 @@
           type: 'button',
           'data-repeat': String(n),
           'data-rep-label': String(n),
+          'data-rep-kind': '전체 듣기 반복',
           'data-rep-all': 'true',
           'aria-pressed': 'false',
           'aria-label': n + '회 전체 듣기 반복',
