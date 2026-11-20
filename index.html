@@ -349,6 +349,28 @@
   .all-rep-row { margin-left: 0; padding-left: 0; gap: 3px; }
   .all-rep-row .rep { min-height: 25px; padding: 2px 7px; }
   .all-rep-row .rep-lbl { font-size: 10px; }
+  /* ── 한영 모드 토글 (앞면·뒷면 공통) ──────────────────── */
+  .koen-toggle {
+    display: inline-flex; align-items: center; gap: 4px;
+    min-height: 30px; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--muted); font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.01em; white-space: nowrap;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .koen-toggle .koen-flag { font-size: 12px; line-height: 1; }
+  .koen-toggle .koen-lbl { line-height: 1.1; }
+  .koen-toggle:active { transform: scale(0.95); }
+  .koen-toggle.is-on {
+    background: var(--brand); border-color: var(--brand); color: #fff;
+    box-shadow: 0 4px 12px rgba(47, 107, 255, 0.28);
+  }
+  .koen-toggle:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  @media (max-width: 430px) {
+    .koen-toggle { min-height: 28px; padding: 2px 9px; font-size: 11px; }
+    .koen-toggle .koen-flag { font-size: 11px; }
+  }
   @media (max-width: 430px) {
     .all-rep-row { gap: 2px; }
     .all-rep-row .rep { min-height: 24px; padding: 2px 6px; font-size: 10.5px; }
@@ -928,7 +950,11 @@
     return null;
   }
 
+  /* 한국어 — 한영 모드에서 먼저 읽는 쪽. 언어 탭(LANGS)에는 나오지 않는다. */
+  var KO_LANG = { code: 'ko', flag: '🇰🇷', label: '한국어', tab: '🇰🇷 한국어', short: 'Kor', name: '한국어', tts: 'ko-KR', intro: false };
+
   function langDef(code) {
+    if (code === 'ko') { return KO_LANG; }
     for (var i = 0; i < LANGS.length; i++) {
       if (LANGS[i].code === code) { return LANGS[i]; }
     }
@@ -1170,6 +1196,7 @@
       sceneId: state.sceneId,
       theme: state.theme,
       speed: state.speed,
+      koEn: !!state.koEn,
       practiceScope: state.practiceScope,
       practiceOrder: state.practiceOrder
     };
@@ -1189,6 +1216,8 @@
     practiceOrder: 'seq',
     theme: 'auto',
     hints: {},
+    /* 한영 모드 — 앞면·뒷면 공통. 켜면 '한국어 → 영어(주력 언어)' 순서로 듣는다. */
+    koEn: false,
     practice: null,
     quiz: null
   };
@@ -1224,6 +1253,27 @@
 
   function sceneAudioUrl(sceneId, turnId) {
     return AUDIO_BASE + 'en-' + sceneId + '-' + turnId + '.mp3';
+  }
+
+  /* 한영 모드용 한국어 클립 — 회화 audio/ko-{장면}-{대사}.mp3
+     입문은 기존 5개국어 규칙(intro-{언어}-{단위})에 맞춰 audio/intro-ko-{단위}.mp3 */
+  function koSceneAudioUrl(sceneId, turnId) {
+    return AUDIO_BASE + 'ko-' + sceneId + '-' + turnId + '.mp3';
+  }
+
+  function koUnitAudioUrl(unitId) {
+    return AUDIO_BASE + 'intro-ko-' + unitId + '.mp3';
+  }
+
+  function koTurnClip(sc, t) {
+    if (!t) { return ''; }
+    if (t.koAudio) { return t.koAudio; }
+    return koSceneAudioUrl((sc && sc.id) || state.sceneId, t.id);
+  }
+
+  function koUnitClip(u) {
+    if (!u) { return ''; }
+    return u.koAudio || koUnitAudioUrl(u.id);
   }
 
   /* 단위의 언어별 클립 경로 (데이터에 audio 가 있으면 그 값을 우선) */
@@ -1430,6 +1480,84 @@
     return speakLang(text, 'en', rate, opts);
   }
 
+  /* ── 한영 모드 — 한국어 → 0.9초 텀 → 영어(주력 언어) ─────
+     state.koEn 이 켜져 있으면 문장 듣기·문장 반복·전체 듣기·전체 반복·5개국어 입문
+     모두 이 한 세트를 한 회차로 센다. 한국어 MP3 가 없거나 실패하면
+     텀 없이 바로 영어로 넘어가고, 영어 클립이 실패하면 기존 폴백과 똑같이 동작한다. */
+  var KO_EN_GAP = 900;
+  var koPair = null;
+
+  function koEnOn() {
+    return !!state.koEn;
+  }
+
+  /* 진행 중인 '한국어 → 영어' 타이머만 정리한다(오디오는 부르는 쪽에서 멈춘다) */
+  function clearKoPair() {
+    var s = koPair;
+    if (!s) { return; }
+    koPair = null;
+    if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    if (s.token) { s.token.active = false; }
+  }
+
+  /* cfg: { koUrl, koText, url, text, code, rate, cancel, onend, onerror, onfallback }
+     koEn 이 꺼져 있으면 speakLang 과 완전히 같은 동작이다. */
+  function speakLangPair(cfg) {
+    cfg = cfg || {};
+    var plain = {
+      audio: cfg.url || '',
+      cancel: cfg.cancel,
+      onend: cfg.onend,
+      onerror: cfg.onerror,
+      onfallback: cfg.onfallback
+    };
+    if (!koEnOn()) { return speakLang(cfg.text, cfg.code, cfg.rate, plain); }
+    clearKoPair();
+    var s = { token: { active: true }, timer: null };
+    koPair = s;
+    function done(okFlag) {
+      s.token.active = false;
+      if (koPair === s) { koPair = null; }
+      if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+      if (okFlag) {
+        if (cfg.onend) { cfg.onend(); }
+      } else if (cfg.onerror) {
+        cfg.onerror();
+      }
+    }
+    function target() {
+      if (!s.token.active) { return; }
+      var res = speakLang(cfg.text, cfg.code, cfg.rate, {
+        audio: cfg.url,
+        cancel: cfg.cancel,
+        onfallback: cfg.onfallback,
+        onend: function () { done(true); },
+        onerror: function () { done(false); }
+      });
+      return res;
+    }
+    function gapThenTarget() {
+      if (!s.token.active) { return; }
+      s.timer = setTimeout(function () { s.timer = null; target(); }, KO_EN_GAP);
+    }
+    var koStarted = false;
+    if (cfg.koUrl) {
+      koStarted = playClip(cfg.koUrl, cfg.rate, {
+        onend: gapThenTarget,
+        /* 한국어 클립이 없거나 실패해도 들려줄 건 들려준다 — 텀 없이 영어로 */
+        onerror: target
+      });
+    }
+    if (!koStarted) {
+      var resKo = speakNative(cfg.koText || '', 'ko', cfg.rate, {
+        silent: true,
+        onend: gapThenTarget
+      });
+      if (!resKo || !resKo.played) { target(); }
+    }
+    return { played: true, via: 'pair', unsupported: false, missingVoice: false };
+  }
+
   function highlight(turnId) {
     var key;
     for (key in cardRefs.frontTurns) {
@@ -1444,14 +1572,20 @@
     }
   }
 
-  /* 대사 1개 듣기 — 대사 객체를 받는다 (sc 를 주면 그 장면의 클립을 쓴다) */
+  /* 대사 1개 듣기 — 대사 객체를 받는다 (sc 를 주면 그 장면의 클립을 쓴다)
+     한영 모드에서는 한국어 → 0.9초 → 영어 한 세트 */
   function speakOne(t, rate, sc) {
     if (!t) { return; }
     var scene = sc || findScene(state.sceneId) || CONTENT.scenes[0];
     stopAll();
     highlight(t.id || null);
-    speakLang(t.en, 'en', rate, {
-      audio: turnClip(scene, t),
+    speakLangPair({
+      koUrl: koTurnClip(scene, t),
+      koText: t.ko,
+      text: t.en,
+      code: 'en',
+      url: turnClip(scene, t),
+      rate: rate,
       onend: function () { highlight(null); },
       onerror: function () { highlight(null); }
     });
@@ -1480,6 +1614,7 @@
   function stopRepeat() {
     if (!repState) { return; }
     clearRepeat();
+    clearKoPair();
     stopAudio();
     cancelSpeech();
   }
@@ -1578,11 +1713,17 @@
     return row;
   }
 
-  /* 한 문장을 현재 배속으로 한 번 재생 — 반복 엔진이 부른다 */
+  /* 한 문장을 현재 배속으로 한 번 재생 — 반복 엔진이 부른다
+     한영 모드에서는 '한국어 → 영어' 가 한 회차다. */
   function repeatTurnPlay(t, sc) {
     return function (opts) {
-      speakLang(t.en, 'en', state.speed, {
-        audio: turnClip(sc, t),
+      speakLangPair({
+        koUrl: koTurnClip(sc, t),
+        koText: t.ko,
+        text: t.en,
+        code: 'en',
+        url: turnClip(sc, t),
+        rate: state.speed,
         onend: opts.onend,
         onerror: opts.onerror
       });
@@ -1600,6 +1741,7 @@
     if (playToken) { playToken.active = false; playToken = null; }
     clearRepeat();
     clearAllRepeat();
+    clearKoPair();
     stopAudio();
     cancelSpeech();
     highlight(null);
@@ -1710,12 +1852,18 @@
     if (failed) { toast('전체 듣기를 멈췄어요', '이 문장 소리를 재생하지 못했습니다.'); }
   }
 
-  /* 지금 장면의 대사 전부를 현재 배속으로 — 전체 듣기·전체 반복의 한 회차 */
+  /* 지금 장면의 대사 전부를 현재 배속으로 — 전체 듣기·전체 반복의 한 회차
+     한영 모드에서는 턴마다 '한국어 → 영어' 를 한 바퀴 돈다. */
   function scenePass(sc) {
     return function (t, opts) {
       highlight(t.id);
-      speakLang(t.en, 'en', state.speed, {
-        audio: turnClip(sc, t),
+      speakLangPair({
+        koUrl: koTurnClip(sc, t),
+        koText: t.ko,
+        text: t.en,
+        code: 'en',
+        url: turnClip(sc, t),
+        rate: state.speed,
         cancel: false,
         onend: opts.onend,
         onerror: opts.onerror
@@ -1759,6 +1907,75 @@
       })(ALL_REPEAT_COUNTS[i]);
     }
     return row;
+  }
+
+  /* ── 한영 모드 토글 (앞면·뒷면 공통) ───────────────────
+     앞면에서 켜면 뒷면 토글도, 뒷면에서 켜면 앞면 토글도 즉시 같이 바뀐다.
+     상태는 state.koEn 하나이고 store.ui.koEn 에 저장된다. */
+  var koEnRefs = [];
+
+  function koEnTargetName() {
+    var L = langDef(state.lang);
+    return L.intro ? L.name : '영어';
+  }
+
+  function koEnLabel() {
+    var L = langDef(state.lang);
+    return L.intro ? ('한' + L.short) : '한영';
+  }
+
+  function koEnHint() {
+    return '한국어 → ' + koEnTargetName() + ' 순서로 듣기 ' + (state.koEn ? '켜짐' : '꺼짐');
+  }
+
+  function koEnToggle() {
+    var lbl = el('span', { class: 'koen-lbl', text: koEnLabel() });
+    var b = el('button', {
+      class: 'koen-toggle' + (state.koEn ? ' is-on' : ''),
+      type: 'button',
+      'data-act': 'koen',
+      'data-koen': koEnLabel(),
+      'aria-pressed': state.koEn ? 'true' : 'false',
+      'aria-label': '한영 모드 — ' + koEnHint() + ' (누르면 바꿈)',
+      title: koEnHint() + ' · 누르면 바꿈'
+    }, [
+      el('span', { class: 'koen-flag', 'aria-hidden': 'true', text: '🇰🇷' }),
+      lbl
+    ]);
+    b.koenLbl = lbl;
+    /* 카드 뒤집기와 겹치지 않도록 클릭을 여기서 끊는다 */
+    press(b, function (ev) {
+      if (ev && ev.stopPropagation) { ev.stopPropagation(); }
+      setKoEn(!state.koEn);
+    });
+    koEnRefs.push(b);
+    return b;
+  }
+
+  function syncKoEn() {
+    for (var i = 0; i < koEnRefs.length; i++) {
+      var b = koEnRefs[i];
+      if (!b) { continue; }
+      b.classList.toggle('is-on', !!state.koEn);
+      b.setAttribute('aria-pressed', state.koEn ? 'true' : 'false');
+      b.setAttribute('aria-label', '한영 모드 — ' + koEnHint() + ' (누르면 바꿈)');
+      b.setAttribute('title', koEnHint() + ' · 누르면 바꿈');
+      b.setAttribute('data-koen', koEnLabel());
+      if (b.koenLbl) { b.koenLbl.textContent = koEnLabel(); }
+    }
+  }
+
+  function setKoEn(on) {
+    state.koEn = !!on;
+    saveUI();
+    syncKoEn();
+    /* 켜고 끄는 순간 진행 중이던 오디오·타이머(반복·전체 듣기 포함)를 즉시 정리 */
+    stopAll();
+    if (state.koEn) {
+      toast('한영 모드 켜짐', '한국어 → ' + koEnTargetName() + ' 순서로 들려드려요.');
+    } else {
+      toast('한영 모드 꺼짐', koEnTargetName() + '만 재생합니다.');
+    }
   }
 
   /* ════════════════════════════════════════════════════
@@ -2129,6 +2346,7 @@
 
   function buildCard(sc) {
     cardRefs = { flip: null, front: null, back: null, playBtn: null, playLbl: null, stopBtn: null, rateTag: null, frontTurns: {}, backTurns: {}, rateBtns: [], backRateBtns: [], sayRates: [] };
+    koEnRefs = [];
 
     var flip = el('div', { class: 'flip', id: 'flip' });
     var front = el('section', { class: 'face front', 'aria-label': '한국어 화면' });
@@ -2141,7 +2359,7 @@
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: '🇰🇷' }),
         el('div', {}, [el('b', { text: '한국어 → 영어' }), el('small', { text: '카드를 탭하면 영어 전체가 보여요' })])
       ]),
-      toBack
+      el('div', { class: 'head-btns' }, [koEnToggle(), toBack])
     ]));
 
     var frontList = el('ol', { class: 'turns' });
@@ -2174,7 +2392,7 @@
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: '🇺🇸' }),
         el('div', {}, [el('b', { text: 'English' }), el('small', { text: '문장마다 원하는 속도로 들어보세요' })])
       ]),
-      el('div', { class: 'head-btns' }, [playBtn, allRep, stopBtn, toFront])
+      el('div', { class: 'head-btns' }, [playBtn, koEnToggle(), allRep, stopBtn, toFront])
     ]));
 
     var backList = el('ol', { class: 'turns' });
@@ -2407,11 +2625,16 @@
       note.textContent = '이 기기에 ' + L.name + ' 음성이 없어요 · 다른 언어로 읽지 않습니다. Chrome 설정에서 ' + L.name + ' 음성 팩을 받아 주세요';
       note.hidden = false;
     }
-    var res = speakLang(sayOf(d), code, state.speed, {
-      audio: unitClip(u, code),
+    var res = speakLangPair({
+      koUrl: koUnitClip(u),
+      koText: u.ko,
+      text: sayOf(d),
+      code: code,
+      url: unitClip(u, code),
+      rate: state.speed,
       onfallback: function (r2) { if (r2 && r2.missingVoice) { showNoVoice(); } }
     });
-    if (res && res.missingVoice) { showNoVoice(); }
+    if (!koEnOn() && res && res.missingVoice) { showNoVoice(); }
   }
 
   function speakUnit(u, code, rate, unitId) {
@@ -2419,14 +2642,20 @@
     if (!d) { return; }
     stopAll();
     highlight(unitId || u.id);
-    speakLang(sayOf(d), code, rate || state.speed, {
-      audio: unitClip(u, code),
+    speakLangPair({
+      koUrl: koUnitClip(u),
+      koText: u.ko,
+      text: sayOf(d),
+      code: code,
+      url: unitClip(u, code),
+      rate: rate || state.speed,
       onend: function () { highlight(null); },
       onerror: function () { highlight(null); }
     });
   }
 
-  /* 한 단위를 지금 고른 주력 언어로 한 번 재생 — 반복 엔진이 부른다 */
+  /* 한 단위를 지금 고른 주력 언어로 한 번 재생 — 반복 엔진이 부른다
+     한영 모드에서는 '한국어 → 주력 언어' 가 한 회차다. */
   function repeatUnitPlay(u) {
     return function (opts) {
       var code = state.lang;
@@ -2435,8 +2664,13 @@
         if (opts.onerror) { opts.onerror(); }
         return;
       }
-      speakLang(sayOf(d), code, state.speed, {
-        audio: unitClip(u, code),
+      speakLangPair({
+        koUrl: koUnitClip(u),
+        koText: u.ko,
+        text: sayOf(d),
+        code: code,
+        url: unitClip(u, code),
+        rate: state.speed,
         onend: opts.onend,
         onerror: opts.onerror
       });
@@ -2482,6 +2716,7 @@
 
   function buildIntroCard(L) {
     cardRefs = { flip: null, front: null, back: null, playBtn: null, playLbl: null, stopBtn: null, rateTag: null, frontTurns: {}, backTurns: {}, rateBtns: [], backRateBtns: [], sayRates: [] };
+    koEnRefs = [];
     miniRefs = {};
 
     var flip = el('div', { class: 'flip', id: 'flip' });
@@ -2495,7 +2730,7 @@
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: '🇰🇷' }),
         el('div', {}, [el('b', { text: '한국어 → 5개국어' }), el('small', { text: '줄마다 국기 버튼을 누르면 발음과 소리가 바로 나와요' })])
       ]),
-      toBack
+      el('div', { class: 'head-btns' }, [koEnToggle(), toBack])
     ]));
 
     var frontList = el('ol', { class: 'turns intro-units' });
@@ -2524,7 +2759,7 @@
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: L.flag }),
         el('div', {}, [el('b', { text: L.name }), el('small', { text: '원문 · 한글 발음 · 표현 팁' })])
       ]),
-      el('div', { class: 'head-btns' }, [playBtn, allRep, stopBtn, toFront])
+      el('div', { class: 'head-btns' }, [playBtn, koEnToggle(), allRep, stopBtn, toFront])
     ]));
 
     /* 4단 속도 */
@@ -2589,13 +2824,19 @@
     return cardRefs.flipStage;
   }
 
-  /* 주력 언어 7단위 전체를 한 회차로 — 5개국어 뒷면 전체 듣기·전체 반복 */
+  /* 주력 언어 7단위 전체를 한 회차로 — 5개국어 뒷면 전체 듣기·전체 반복
+     한영 모드에서는 단위마다 '한국어 → 주력 언어' 를 한 바퀴 돈다. */
   function introPass(L) {
     return function (u, opts) {
       var d = u.t[L.code];
       highlight(u.id);
-      speakLang(sayOf(d), L.code, state.speed, {
-        audio: unitClip(u, L.code),
+      speakLangPair({
+        koUrl: koUnitClip(u),
+        koText: u.ko,
+        text: sayOf(d),
+        code: L.code,
+        url: unitClip(u, L.code),
+        rate: state.speed,
         cancel: false,
         onend: opts.onend,
         onerror: opts.onerror
@@ -3486,6 +3727,7 @@
     if (ui.lang && langDef(ui.lang).code === ui.lang) { state.lang = ui.lang; }
     if (ui.theme === 'auto' || ui.theme === 'light' || ui.theme === 'dark') { state.theme = ui.theme; }
     if (typeof ui.speed === 'number' && ui.speed > 0) { state.speed = ui.speed; }
+    if (ui.koEn === true) { state.koEn = true; }
     if (ui.practiceScope === 'all' || ui.practiceScope === 'me') { state.practiceScope = ui.practiceScope; }
     if (ui.practiceOrder === 'rand' || ui.practiceOrder === 'seq') { state.practiceOrder = ui.practiceOrder; }
     if (ui.tab && VIEWS[ui.tab]) { state.tab = ui.tab; }
