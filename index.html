@@ -607,6 +607,69 @@
   var CONTENT = {
     scenes: [
       {
+        id: 'cafe-01-wait',
+        chapter: 'Chapter 1 · 카페',
+        chip: 'Scene 1 · 입장 & 대기',
+        title: '자리 확인하고 웨이팅 올리기',
+        learnedDate: '2026-11-20',
+        turns: [
+          {
+            id: 't1',
+            speaker: 'partner',
+            role: '직원',
+            ko: '안녕하세요, 어서 오세요! 몇 분이세요?',
+            en: 'Hi, welcome in! How many in your party?',
+            hint: 'in your party',
+            note: ''
+          },
+          {
+            id: 't2',
+            speaker: 'me',
+            role: '나',
+            ko: '두 명이에요. 혹시 지금 앉을 자리 있나요?',
+            en: 'Two of us. Do you have any seats available right now?',
+            hint: 'seats available',
+            note: ''
+          },
+          {
+            id: 't3',
+            speaker: 'partner',
+            role: '직원',
+            ko: '지금은 만석이라 10분 정도 대기하셔야 해요. 성함이 어떻게 되세요?',
+            en: "We're full right now, so it'll be about a 10-minute wait. Can I get a name for the list?",
+            hint: 'a name for the list',
+            note: ''
+          },
+          {
+            id: 't4',
+            speaker: 'me',
+            role: '나',
+            ko: '제이요. 밖에서 기다려도 될까요?',
+            en: "It's Jay. Is it okay if we wait outside?",
+            hint: 'wait outside',
+            note: ''
+          },
+          {
+            id: 't5',
+            speaker: 'partner',
+            role: '직원',
+            ko: '네, 물론이죠! 자리 나면 바로 불러드릴게요.',
+            en: "Sure, no problem! We'll call your name as soon as a table opens up.",
+            hint: 'opens up',
+            note: ''
+          },
+          {
+            id: 't6',
+            speaker: 'me',
+            role: '나',
+            ko: '감사합니다. 금방 들어올게요!',
+            en: "Thanks! We'll be right back.",
+            hint: 'right back',
+            note: ''
+          }
+        ]
+      },
+      {
         id: 'cafe-sample-order',
         chapter: 'Chapter 1 · 카페',
         chip: 'Sample · 주문부터 결제까지',
@@ -3104,9 +3167,27 @@
     refs.scores = refs.viewScores;
   }
 
+  /* 가장 최근에 배운 장면 = learnedDate 가 가장 늦은 장면.
+     CONTENT.scenes 는 최신 장면이 앞에 오도록 두고, 앱을 열면 항상 최신 장면이 뜬다. */
+  function latestScene() {
+    var best = CONTENT.scenes[0];
+    for (var i = 1; i < CONTENT.scenes.length; i++) {
+      if (String(CONTENT.scenes[i].learnedDate || '') > String(best.learnedDate || '')) {
+        best = CONTENT.scenes[i];
+      }
+    }
+    return best;
+  }
+
   function restoreUI() {
     var ui = (store && store.ui) || {};
     if (ui.sceneId && findScene(ui.sceneId)) { state.sceneId = ui.sceneId; }
+    /* 새 장면이 추가되면 저장된 옛 선택보다 최신 장면을 우선한다 */
+    var latest = latestScene();
+    var cur = findScene(state.sceneId);
+    if (latest && (!cur || String(latest.learnedDate || '') > String(cur.learnedDate || ''))) {
+      state.sceneId = latest.id;
+    }
     if (ui.lang && langDef(ui.lang).code === ui.lang) { state.lang = ui.lang; }
     if (ui.theme === 'auto' || ui.theme === 'light' || ui.theme === 'dark') { state.theme = ui.theme; }
     if (typeof ui.speed === 'number' && ui.speed > 0) { state.speed = ui.speed; }
