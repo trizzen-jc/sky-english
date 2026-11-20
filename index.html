@@ -325,7 +325,7 @@
     font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em;
   }
   .hint-pill::before { content: "💡 "; }
-  /* ── 문장별 자동 반복 [3][5][10] ─────────────────────── */
+  /* ── 문장별 자동 반복 3 · 5 · 10 ─────────────────────── */
   .rep-row {
     display: inline-flex; align-items: center; gap: 4px;
     margin-left: auto; padding-left: 6px;
@@ -1449,7 +1449,7 @@
     });
   }
 
-  /* ── 문장별 자동 반복 [3][5][10] ────────────────────────
+  /* ── 문장별 자동 반복 3 · 5 · 10 ────────────────────────
      한 문장을 3·5·10회 연속 재생한다(회차 사이 0.5초).
      진행 중인 버튼은 '3 · 1/3' 처럼 진행을 보여 주고,
      같은 버튼을 다시 누르거나 다른 소리를 내면 즉시 멈춘다. */
@@ -1478,7 +1478,7 @@
 
   function repLabel(btn, i, n) {
     if (!btn || !btn.setAttribute) { return; }
-    var base = btn.getAttribute('data-rep-label') || ('[' + btn.getAttribute('data-repeat') + ']');
+    var base = btn.getAttribute('data-rep-label') || String(btn.getAttribute('data-repeat') || '');
     var count = String(n || btn.getAttribute('data-repeat') || '');
     if (!i) {
       btn.textContent = base;
@@ -1549,11 +1549,11 @@
           class: 'rep',
           type: 'button',
           'data-repeat': String(n),
-          'data-rep-label': '[' + n + ']',
+          'data-rep-label': String(n),
           'aria-pressed': 'false',
           'aria-label': n + '회 자동 반복',
           title: n + '회 연속 듣기',
-          text: '[' + n + ']'
+          text: String(n)
         });
         /* 카드 뒤집기와 겹치지 않도록 클릭을 여기서 끊는다(press 가 stopPropagation) */
         press(b, function (ev) {
