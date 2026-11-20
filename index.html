@@ -345,6 +345,14 @@
     box-shadow: 0 4px 12px rgba(47, 107, 255, 0.28);
   }
   .rep:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  /* ── 전체 듣기 옆 전체 반복 3 · 5 · 7 ────────────────── */
+  .all-rep-row { margin-left: 0; padding-left: 0; gap: 3px; }
+  .all-rep-row .rep { min-height: 25px; padding: 2px 7px; }
+  .all-rep-row .rep-lbl { font-size: 10px; }
+  @media (max-width: 430px) {
+    .all-rep-row { gap: 2px; }
+    .all-rep-row .rep { min-height: 24px; padding: 2px 6px; font-size: 10.5px; }
+  }
   .acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-top: 9px; }
   .btn-clip { white-space: nowrap; }
   @media (max-width: 430px) {
@@ -1590,6 +1598,7 @@
   function stopAll() {
     if (playToken) { playToken.active = false; playToken = null; }
     clearRepeat();
+    clearAllRepeat();
     stopAudio();
     cancelSpeech();
     highlight(null);
@@ -1602,27 +1611,40 @@
     restorePlayBtn();
   }
 
-  function playAll() {
-    var sc = currentScene();
+  /* ── 뒷면 전체 듣기 · 전체 반복 3 · 5 · 7 ───────────────
+     한 회차 = 그 화면의 모든 대사를 순서대로 끝까지.
+     회차 사이 0.8초를 두고 3·5·7회 반복한다.
+     진행 중인 버튼은 '3 · 1/3' 처럼 회차를 보여 주고,
+     같은 버튼을 다시 누르거나 전체 듣기/정지·문장 듣기·배속·카드 뒤집기·화면 전환이
+     있으면 타이머와 오디오를 즉시 멈춘다. */
+  var ALL_REPEAT_COUNTS = [3, 5, 7];
+  var ALL_REPEAT_GAP = 800;
+  var allRepState = null;
+
+  /* 전체 반복 상태만 정리한다(오디오·기기 음성은 부르는 쪽에서 멈춘다) */
+  function clearAllRepeat() {
+    var s = allRepState;
+    if (!s) { return; }
+    allRepState = null;
+    if (s.token) { s.token.active = false; }
+    if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    repLabel(s.btn, 0, s.n);
+  }
+
+  /* 사용자가 직접 멈춤 — 타이머·MP3·기기 음성·재생 버튼까지 */
+  function stopAllRepeat() {
+    if (!allRepState) { return; }
+    clearAllRepeat();
     stopAll();
-    if (!audioAvailable() && !ttsAvailable()) {
-      toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
-      return;
-    }
-    var token = { active: true };
-    playToken = token;
-    if (cardRefs.playBtn) { cardRefs.playBtn.classList.add('is-playing'); }
-    if (cardRefs.playLbl) { cardRefs.playLbl.textContent = '▶ 재생 중…'; }
-    if (cardRefs.stopBtn) { cardRefs.stopBtn.hidden = false; }
+  }
+
+  /* items 를 순서대로 한 회차 재생 — play(item, opts) 가 opts.onend/onerror 를 부른다 */
+  function playRound(items, play, token, onpass, onfail) {
     var i = 0;
     function step() {
       if (!token.active) { return; }
-      if (i >= sc.turns.length) { endPlay(); return; }
-      var t = sc.turns[i];
-      highlight(t.id);
-      speakLang(t.en, 'en', state.speed, {
-        audio: turnClip(sc, t),
-        cancel: false,
+      if (i >= items.length) { onpass(); return; }
+      play(items[i], {
         onend: function () {
           if (!token.active) { return; }
           i += 1;
@@ -1630,11 +1652,111 @@
         },
         onerror: function () {
           if (!token.active) { return; }
-          endPlay();
+          onfail();
         }
       });
     }
     step();
+  }
+
+  function showPlaying(on) {
+    if (cardRefs.playBtn) { cardRefs.playBtn.classList.toggle('is-playing', !!on); }
+    if (cardRefs.playLbl) { cardRefs.playLbl.textContent = on ? '▶ 재생 중…' : '🔊 전체 듣기'; }
+    if (cardRefs.stopBtn) { cardRefs.stopBtn.hidden = !on; }
+  }
+
+  /* cfg: { btn, rounds, items, play(item, opts) } — btn 이 없으면 한 번만 재생 */
+  function startPlaySequence(cfg) {
+    stopAll();
+    if (!audioAvailable() && !ttsAvailable()) {
+      toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
+      return;
+    }
+    var s = { btn: cfg.btn || null, n: cfg.rounds || 1, i: 0, token: null, timer: null };
+    if (s.btn) { allRepState = s; }
+    showPlaying(true);
+    s.token = { active: true };
+    playToken = s.token;
+    runPlayRound(s, cfg);
+  }
+
+  function runPlayRound(s, cfg) {
+    if (!s.token || !s.token.active) { return; }
+    s.i += 1;
+    if (s.btn) { repLabel(s.btn, s.i, s.n); }
+    playRound(cfg.items, cfg.play, s.token, function () {
+      if (!s.token || !s.token.active) { return; }
+      if (s.i >= s.n) { finishPlaySequence(s, false); return; }
+      s.timer = setTimeout(function () {
+        s.timer = null;
+        runPlayRound(s, cfg);
+      }, ALL_REPEAT_GAP);
+    }, function () {
+      if (!s.token || !s.token.active) { return; }
+      finishPlaySequence(s, true);
+    });
+  }
+
+  function finishPlaySequence(s, failed) {
+    if (s.token) { s.token.active = false; }
+    if (playToken === s.token) { playToken = null; }
+    if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    if (allRepState === s) {
+      allRepState = null;
+      repLabel(s.btn, 0, s.n);
+    }
+    endPlay();
+    if (failed) { toast('전체 듣기를 멈췄어요', '이 문장 소리를 재생하지 못했습니다.'); }
+  }
+
+  /* 지금 장면의 대사 전부를 현재 배속으로 — 전체 듣기·전체 반복의 한 회차 */
+  function scenePass(sc) {
+    return function (t, opts) {
+      highlight(t.id);
+      speakLang(t.en, 'en', state.speed, {
+        audio: turnClip(sc, t),
+        cancel: false,
+        onend: opts.onend,
+        onerror: opts.onerror
+      });
+    };
+  }
+
+  function playAll() {
+    var sc = currentScene();
+    startPlaySequence({ rounds: 1, items: sc.turns, play: scenePass(sc) });
+  }
+
+  /* '반복' 라벨 + 3 · 5 · 7 — 전체 듣기 버튼 옆(같은 컨트롤 줄)에 붙는다 */
+  function allRepeatRow(makeCfg) {
+    var row = el('div', { class: 'rep-row all-rep-row', role: 'group', 'aria-label': '전체 듣기 반복' });
+    row.appendChild(el('span', { class: 'rep-lbl', text: '반복' }));
+    for (var i = 0; i < ALL_REPEAT_COUNTS.length; i++) {
+      (function (n) {
+        var b = el('button', {
+          class: 'rep rep-all',
+          type: 'button',
+          'data-repeat': String(n),
+          'data-rep-label': String(n),
+          'data-rep-all': 'true',
+          'aria-pressed': 'false',
+          'aria-label': n + '회 전체 듣기 반복',
+          title: '전체 듣기 ' + n + '회 반복',
+          text: String(n)
+        });
+        /* 카드 뒤집기와 겹치지 않도록 클릭을 여기서 끊는다(press 가 stopPropagation) */
+        press(b, function (ev) {
+          if (ev && ev.stopPropagation) { ev.stopPropagation(); }
+          if (allRepState && allRepState.btn === b) { stopAllRepeat(); return; }
+          var cfg = makeCfg();
+          cfg.btn = b;
+          cfg.rounds = n;
+          startPlaySequence(cfg);
+        });
+        row.appendChild(b);
+      })(ALL_REPEAT_COUNTS[i]);
+    }
+    return row;
   }
 
   /* ════════════════════════════════════════════════════
@@ -2039,13 +2161,18 @@
     var stopBtn = el('button', { class: 'btn small btn-stop', type: 'button', text: '⏹ 정지', hidden: true });
     press(stopBtn, function () { stopAll(); });
     var toFront = press(el('button', { class: 'btn ghost small btn-flip', type: 'button', text: '↻ 한국어로 돌아가기' }), function () { setFlip(false); });
+    /* 전체 듣기 옆 전체 반복 3 · 5 · 7 — 누른 시점의 장면을 한 회차로 삼는다 */
+    var allRep = allRepeatRow(function () {
+      var cur = currentScene();
+      return { items: cur.turns, play: scenePass(cur) };
+    });
 
     back.appendChild(el('div', { class: 'face-head' }, [
       el('div', { class: 'face-title' }, [
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: '🇺🇸' }),
         el('div', {}, [el('b', { text: 'English' }), el('small', { text: '문장마다 원하는 속도로 들어보세요' })])
       ]),
-      el('div', { class: 'head-btns' }, [playBtn, stopBtn, toFront])
+      el('div', { class: 'head-btns' }, [playBtn, allRep, stopBtn, toFront])
     ]));
 
     var backList = el('ol', { class: 'turns' });
@@ -2098,7 +2225,8 @@
   function setFlip(next) {
     state.flipped = !!next;
     if (!cardRefs.flip) { return; }
-    if (state.flipped) { stopAll(); }
+    /* 어느 쪽으로 뒤집어도 진행 중인 전체 듣기·반복은 즉시 멈춘다 */
+    stopAll();
     cardRefs.flip.classList.toggle('is-flipped', state.flipped);
     syncSideToggle();
     cardRefs.front.setAttribute('aria-hidden', state.flipped ? 'true' : 'false');
@@ -2383,13 +2511,18 @@
     var stopBtn = el('button', { class: 'btn small btn-stop', type: 'button', text: '⏹ 정지', hidden: true });
     press(stopBtn, function () { stopAll(); });
     var toFront = press(el('button', { class: 'btn ghost small btn-flip', type: 'button', text: '↻ 한국어로 돌아가기' }), function () { setFlip(false); });
+    /* 전체 듣기 옆 전체 반복 3 · 5 · 7 — 7단위를 주력 언어로 한 회차 */
+    var allRep = allRepeatRow(function () {
+      var Ln = langDef(state.lang);
+      return { items: INTRO.units, play: introPass(Ln) };
+    });
 
     back.appendChild(el('div', { class: 'face-head' }, [
       el('div', { class: 'face-title' }, [
         el('span', { class: 'face-flag', 'aria-hidden': 'true', text: L.flag }),
         el('div', {}, [el('b', { text: L.name }), el('small', { text: '원문 · 한글 발음 · 표현 팁' })])
       ]),
-      el('div', { class: 'head-btns' }, [playBtn, stopBtn, toFront])
+      el('div', { class: 'head-btns' }, [playBtn, allRep, stopBtn, toFront])
     ]));
 
     /* 4단 속도 */
@@ -2405,6 +2538,8 @@
           text: sp.label
         });
         press(b, function () {
+          /* 배속을 바꾸면 진행 중인 전체 듣기·반복은 즉시 멈춘다 */
+          stopAll();
           state.speed = sp.r;
           saveUI();
           syncSpeed();
@@ -2452,41 +2587,23 @@
     return cardRefs.flipStage;
   }
 
-  function playAllIntro() {
-    var L = langDef(state.lang);
-    var units = INTRO.units;
-    stopAll();
-    if (!audioAvailable() && !ttsAvailable()) {
-      toast('소리를 재생하지 못했어요', 'MP3 를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 눌러주세요.');
-      return;
-    }
-    var token = { active: true };
-    playToken = token;
-    if (cardRefs.playBtn) { cardRefs.playBtn.classList.add('is-playing'); }
-    if (cardRefs.playLbl) { cardRefs.playLbl.textContent = '▶ 재생 중…'; }
-    if (cardRefs.stopBtn) { cardRefs.stopBtn.hidden = false; }
-    var i = 0;
-    function step() {
-      if (!token.active) { return; }
-      if (i >= units.length) { endPlay(); return; }
-      var u = units[i];
+  /* 주력 언어 7단위 전체를 한 회차로 — 5개국어 뒷면 전체 듣기·전체 반복 */
+  function introPass(L) {
+    return function (u, opts) {
       var d = u.t[L.code];
       highlight(u.id);
       speakLang(sayOf(d), L.code, state.speed, {
         audio: unitClip(u, L.code),
         cancel: false,
-        onend: function () {
-          if (!token.active) { return; }
-          i += 1;
-          step();
-        },
-        onerror: function () {
-          if (!token.active) { return; }
-          endPlay();
-        }
+        onend: opts.onend,
+        onerror: opts.onerror
       });
-    }
-    step();
+    };
+  }
+
+  function playAllIntro() {
+    var L = langDef(state.lang);
+    startPlaySequence({ rounds: 1, items: INTRO.units, play: introPass(L) });
   }
 
   function selectScene(id) {
