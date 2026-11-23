@@ -222,21 +222,25 @@
   .chip.is-on { border-color: var(--brand); background: var(--brand-soft); box-shadow: var(--shadow-sm); }
   .chip.is-static { cursor: default; }
 
-  /* ── 장면 칩 줄 + 큼직한 Eng/Kor 전환 버튼 ───────────── */
+  /* ── 장면 칩 줄 ─────────────────────────────────────── */
   .scene-row { display: flex; align-items: stretch; gap: 8px; padding: 2px 2px 10px; }
   .scene-row .chips { flex: 1 1 auto; min-width: 0; padding: 0; }
+
+  /* ── 제목 줄 + 그 오른쪽의 작은 Eng/Kor 전환 버튼 ─────── */
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 4px; }
+  .title-row .scene-title { flex: 1 1 auto; min-width: 0; padding: 0; }
   .side-toggle {
     flex: 0 0 auto;
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    min-width: 116px; padding: 10px 16px; border-radius: 14px;
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 58px; padding: 4px 7px; border-radius: 10px;
     border: 1px solid transparent;
     background: linear-gradient(150deg, var(--side-btn-1) 0%, var(--side-btn-2) 100%);
     color: var(--side-btn-ink);
-    font-size: 15px; font-weight: 800; letter-spacing: -0.01em;
+    font-size: 11px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
     box-shadow: var(--side-btn-shadow);
     cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
   }
-  .side-toggle .side-flag { font-size: 18px; line-height: 1; }
+  .side-toggle .side-flag { font-size: 12px; line-height: 1; }
   .side-toggle .side-lbl { line-height: 1.15; }
   .side-toggle:active { transform: scale(0.97); }
   .side-toggle:focus-visible { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
@@ -2254,10 +2258,17 @@
     sideRefs.btn.setAttribute('title', back ? '한국어 화면으로 전환' : (s.name + ' 화면으로 전환'));
   }
 
+  /* ── 제목 줄: 제목 왼쪽, 전환 버튼 오른쪽 ─────────────── */
+  function titleRow(text) {
+    var row = el('div', { class: 'title-row' });
+    row.appendChild(el('p', { class: 'scene-title', text: text }));
+    row.appendChild(sideToggle());
+    return row;
+  }
+
   function sceneRow() {
     var row = el('div', { class: 'scene-row' });
     row.appendChild(sceneChips());
-    row.appendChild(sideToggle());
     return row;
   }
 
@@ -2618,7 +2629,7 @@
   function renderEnglishStudy(root) {
     var sc = currentScene();
     root.appendChild(sceneRow());
-    root.appendChild(el('p', { class: 'scene-title', text: sc.title }));
+    root.appendChild(titleRow(sc.title));
     root.appendChild(metaStrip(sc));
     root.appendChild(buildCard(sc));
     setFlip(state.flipped);
@@ -2640,7 +2651,6 @@
   function introSceneRow() {
     var row = el('div', { class: 'scene-row' });
     row.appendChild(el('div', { class: 'chips', 'aria-label': '학습 세트' }, [introChip()]));
-    row.appendChild(sideToggle());
     return row;
   }
 
@@ -2658,7 +2668,7 @@
   function renderIntroStudy(root) {
     var L = langDef(state.lang);
     root.appendChild(introSceneRow());
-    root.appendChild(el('p', { class: 'scene-title', text: INTRO.title }));
+    root.appendChild(titleRow(INTRO.title));
     root.appendChild(introMeta(L));
     root.appendChild(buildIntroCard(L));
     setFlip(state.flipped);
